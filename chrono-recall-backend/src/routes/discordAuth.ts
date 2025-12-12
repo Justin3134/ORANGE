@@ -156,11 +156,11 @@ export const handleDiscordCallback = async (req: Request, res: Response) => {
 
   if (error) {
     console.error('Discord OAuth error:', error);
-    return res.redirect(`${config.frontendUrl}/login?discord_error=${error}`);
+    return res.redirect(`${config.frontendUrl}/dashboard?discord_error=${error}`);
   }
 
   if (!code || !userId) {
-    return res.redirect(`${config.frontendUrl}/login?discord_error=missing_params`);
+    return res.redirect(`${config.frontendUrl}/dashboard?discord_error=missing_params`);
   }
 
   try {
@@ -225,7 +225,7 @@ export const handleDiscordCallback = async (req: Request, res: Response) => {
     console.log(`   User is in ${guilds.length} server(s)`);
 
     // Redirect to frontend with success and user info
-    const redirectUrl = new URL(`${config.frontendUrl}/login`);
+    const redirectUrl = new URL(`${config.frontendUrl}/dashboard`);
     redirectUrl.searchParams.set('discord_connected', 'true');
     redirectUrl.searchParams.set('email', discordEmail);
     redirectUrl.searchParams.set('name', userInfo.username);
@@ -233,7 +233,7 @@ export const handleDiscordCallback = async (req: Request, res: Response) => {
     res.redirect(redirectUrl.toString());
   } catch (err: any) {
     console.error('Discord OAuth token exchange error:', err);
-    res.redirect(`${config.frontendUrl}/login?discord_error=token_exchange_failed`);
+    res.redirect(`${config.frontendUrl}/dashboard?discord_error=token_exchange_failed`);
   }
 };
 

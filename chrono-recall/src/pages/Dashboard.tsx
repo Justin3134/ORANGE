@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { User, ChevronRight, Sparkles, Filter, Search, Brain } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,9 +13,11 @@ import {
 } from "@/config/constants";
 import { Mail } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
+import { toast } from "sonner";
 
 const Dashboard = () => {
-  const { user } = useUser();
+  const { user, login } = useUser();
+  const [searchParams] = useSearchParams();
   const userId = user?.id || 'guest';
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,42 +45,56 @@ const Dashboard = () => {
     }
   };
 
-  // Check user status and OAuth callback on mount
-  React.useEffect(() => {
+  // Handle OAuth callback - auto-login user
+  useEffect(() => {
+    const gmailConnectedParam = searchParams.get('gmail_connected');
+    const discordConnectedParam = searchParams.get('discord_connected');
+    const email = searchParams.get('email');
+    const name = searchParams.get('name');
+
+    if ((gmailConnectedParam === 'true' || discordConnectedParam === 'true') && email) {
+      // Auto-login the user from OAuth
+      login(email, name || undefined);
+      toast.success(`Successfully connected ${gmailConnectedParam ? 'Gmail' : 'Discord'}!`);
+
+      if (gmailConnectedParam) {
+        setGmailConnected(true);
+        setConnectedPlatforms(prev => [...new Set([...prev, 'gmail'])]);
+        setHasSyncedData(true);
+      }
+      if (discordConnectedParam) {
+        setConnectedPlatforms(prev => [...new Set([...prev, 'discord'])]);
+        setHasSyncedData(true);
+      }
+
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [searchParams, login]);
+
+  // Check user status on mount
+  useEffect(() => {
     const checkStatus = async () => {
+      if (userId === 'guest') return;
+
       try {
         const status = await getUserStatus(userId);
         if (status.connectedServices?.includes('gmail')) {
           setGmailConnected(true);
           setConnectedPlatforms(prev => [...new Set([...prev, 'gmail'])]);
           setHasSyncedData(true);
-          // Fetch real memories
           fetchRecentMemories();
+        }
+        if (status.connectedServices?.includes('discord')) {
+          setConnectedPlatforms(prev => [...new Set([...prev, 'discord'])]);
+          setHasSyncedData(true);
         }
       } catch (err) {
         console.error("Failed to get user status:", err);
       }
     };
     checkStatus();
-
-    // Check for OAuth callback in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('gmail_connected') === 'true') {
-      setGmailConnected(true);
-      setConnectedPlatforms(prev => [...new Set([...prev, 'gmail'])]);
-      setHasSyncedData(true);
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      // Fetch real memories
-      fetchRecentMemories();
-    }
-    if (urlParams.get('discord_connected') === 'true') {
-      setConnectedPlatforms(prev => [...new Set([...prev, 'discord'])]);
-      setHasSyncedData(true);
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
+  }, [userId]);
 
   // Function to search the backend with AI
   const handleSearch = async (query: string) => {

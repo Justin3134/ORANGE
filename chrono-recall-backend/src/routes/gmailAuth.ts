@@ -96,11 +96,11 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
 
   if (error) {
     console.error('OAuth error:', error);
-    return res.redirect(`${config.frontendUrl}/login?gmail_error=${error}`);
+    return res.redirect(`${config.frontendUrl}/dashboard?gmail_error=${error}`);
   }
 
   if (!code || !userId) {
-    return res.redirect(`${config.frontendUrl}/login?gmail_error=missing_params`);
+    return res.redirect(`${config.frontendUrl}/dashboard?gmail_error=missing_params`);
   }
 
   try {
@@ -131,7 +131,7 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
     console.log(`Gmail connected for user ${finalUserId} (${userEmail})`);
 
     // Redirect back to frontend with success and user info
-    const redirectUrl = new URL(`${config.frontendUrl}/login`);
+    const redirectUrl = new URL(`${config.frontendUrl}/dashboard`);
     redirectUrl.searchParams.set('gmail_connected', 'true');
     redirectUrl.searchParams.set('email', userEmail);
     redirectUrl.searchParams.set('name', userName);
@@ -139,7 +139,7 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
     res.redirect(redirectUrl.toString());
   } catch (err: any) {
     console.error('OAuth token exchange error:', err);
-    res.redirect(`${config.frontendUrl}/login?gmail_error=token_exchange_failed`);
+    res.redirect(`${config.frontendUrl}/dashboard?gmail_error=token_exchange_failed`);
   }
 };
 
