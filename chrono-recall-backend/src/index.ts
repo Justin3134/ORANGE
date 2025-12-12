@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -74,7 +74,7 @@ app.post('/api/chat', handleChat);
 app.get('/api/memories/recent', getRecentEmails);
 
 // User status endpoint - returns connected services
-app.get('/api/user/status', (req, res) => {
+app.get('/api/user/status', (req: Request, res: Response) => {
   const { userId } = req.query;
 
   if (!userId || typeof userId !== 'string') {
@@ -100,8 +100,7 @@ app.get('/api/user/status', (req, res) => {
 });
 
 // Legacy routes for frontend compatibility
-app.post('/api/sync-fake', async (req, res) => {
-  const { userId } = req.body;
+app.post('/api/sync-fake', async (req: Request, res: Response) => {
   // Return mock data for testing
   res.json({
     synced: 5,
@@ -110,8 +109,8 @@ app.post('/api/sync-fake', async (req, res) => {
   });
 });
 
-app.post('/api/search-ai', async (req, res) => {
-  const { userId, query } = req.body;
+app.post('/api/search-ai', async (req: Request, res: Response) => {
+  const { query } = req.body;
   // Return mock search results
   res.json({
     rawQuery: query,
@@ -126,13 +125,13 @@ app.post('/api/search-ai', async (req, res) => {
 });
 
 // Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
 // 404 handler
-app.use((req, res) => {
+app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
