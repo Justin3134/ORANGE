@@ -15,12 +15,16 @@ import {
   Clock,
   ExternalLink,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Mail,
   Hash,
   Loader2,
   CheckCircle,
   AlertCircle,
   Link2,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -99,6 +103,10 @@ const Chat = () => {
     }
     if (urlParams.get('discord_connected') === 'true') {
       setConnectedServices(prev => [...new Set([...prev, 'discord'])]);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    if (urlParams.get('slack_connected') === 'true') {
+      setConnectedServices(prev => [...new Set([...prev, 'slack'])]);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -208,15 +216,29 @@ const Chat = () => {
   };
 
   return (
-    <div className="h-screen flex bg-background">
+    <div className="h-screen flex bg-background overflow-hidden">
+      {/* Sidebar Overlay for mobile */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <motion.aside
-        initial={{ x: -300 }}
-        animate={{ x: sidebarOpen ? 0 : -300 }}
+        initial={false}
+        animate={{ 
+          width: sidebarOpen ? 280 : 0,
+          opacity: sidebarOpen ? 1 : 0 
+        }}
+        transition={{ duration: 0.2, ease: "easeInOut" }}
         className={cn(
-          "w-[280px] border-r border-border/50 flex flex-col bg-card/30 backdrop-blur-sm fixed lg:relative h-full z-40",
-          !sidebarOpen && "lg:hidden"
+          "border-r border-border/50 flex flex-col bg-card/30 backdrop-blur-sm h-full z-40 overflow-hidden",
+          "fixed lg:relative",
+          !sidebarOpen && "border-r-0"
         )}
+        style={{ minWidth: sidebarOpen ? 280 : 0 }}
       >
         {/* New Chat Button */}
         <div className="p-4">
@@ -291,15 +313,20 @@ const Chat = () => {
       </motion.aside>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         {/* Header */}
-        <header className="h-14 border-b border-border/50 flex items-center justify-between px-4 bg-background/80 backdrop-blur-sm">
+        <header className="h-14 border-b border-border/50 flex items-center justify-between px-4 bg-background/80 backdrop-blur-sm shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-secondary/50 rounded-lg transition-colors lg:hidden"
+              className="p-2 hover:bg-secondary/50 rounded-lg transition-colors"
+              title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
             >
-              <MessageSquare className="w-5 h-5" />
+              {sidebarOpen ? (
+                <PanelLeftClose className="w-5 h-5" />
+              ) : (
+                <PanelLeft className="w-5 h-5" />
+              )}
             </button>
             <Link to="/" className="flex items-center gap-2">
               <img src={logo} alt="RecallJump" className="w-7 h-7 object-contain" />

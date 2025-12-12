@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { config } from '../config/env';
 import { getAuthenticatedClient } from './gmailAuth';
 import { searchDiscordMessages, isDiscordConnected } from './discordAuth';
+import { searchSlackMessages, isSlackConnected } from './slackAuth';
 import { google } from 'googleapis';
 
 // Initialize OpenAI client
@@ -307,9 +308,12 @@ export const handleChat = async (req: Request, res: Response) => {
   try {
     let gmailMessages: any[] = [];
     let discordMessages: any[] = [];
+    let slackMessages: any[] = [];
 
     // Parse the user's query to extract search terms
     console.log(`\n📝 User query: "${message}"`);
+    console.log(`📱 Platforms requested: ${platforms.join(', ')}`);
+    console.log(`👤 User ID: ${userId}`);
     const parsed = await parseUserQuery(openai, message);
     console.log('🔎 Parsed search terms:', JSON.stringify(parsed));
 
@@ -328,19 +332,44 @@ export const handleChat = async (req: Request, res: Response) => {
       }
     }
 
-    if (platforms.includes('discord') && isDiscordConnected(userId)) {
-      // Build Discord search query from parsed terms
-      const discordQuery = [
-        ...parsed.names,
-        ...parsed.topics,
-        ...parsed.keywords,
-        ...parsed.partialNames
-      ].join(' ');
-      console.log(`💬 Discord query: "${discordQuery}"`);
+    if (platforms.includes('discord')) {
+      const discordConnected = isDiscordConnected(userId);
+      console.log(`💬 Discord connected for ${userId}: ${discordConnected}`);
+      
+      if (discordConnected) {
+        // Build Discord search query from parsed terms
+        const discordQuery = [
+          ...parsed.names,
+          ...parsed.topics,
+          ...parsed.keywords,
+          ...parsed.partialNames
+        ].join(' ');
+        console.log(`💬 Discord query: "${discordQuery}"`);
 
-      // Search Discord messages
-      discordMessages = searchDiscordMessages(userId, discordQuery);
-      console.log(`💬 Found ${discordMessages.length} Discord messages`);
+        // Search Discord messages
+        discordMessages = searchDiscordMessages(userId, discordQuery);
+        console.log(`💬 Found ${discordMessages.length} Discord messages`);
+      }
+    }
+
+    if (platforms.includes('slack')) {
+      const slackConnected = isSlackConnected(userId);
+      console.log(`📨 Slack connected for ${userId}: ${slackConnected}`);
+      
+      if (slackConnected) {
+        // Build Slack search query from parsed terms
+        const slackQuery = [
+          ...parsed.names,
+          ...parsed.topics,
+          ...parsed.keywords,
+          ...parsed.partialNames
+        ].join(' ');
+        console.log(`📨 Slack query: "${slackQuery}"`);
+
+        // Search Slack messages
+        slackMessages = searchSlackMessages(userId, slackQuery);
+        console.log(`📨 Found ${slackMessages.length} Slack messages`);
+      }
     }
 
     // Build context from matching emails
@@ -359,8 +388,16 @@ export const handleChat = async (req: Request, res: Response) => {
       ).join('\n\n---\n\n');
     }
 
+    // Build context from matching Slack messages
+    let slackContext = '';
+    if (slackMessages.length > 0) {
+      slackContext = slackMessages.map(m =>
+        `[SLACK] Channel: #${m.channelName}\nDate: ${m.timestamp}\nMessage: ${m.text}`
+      ).join('\n\n---\n\n');
+    }
+
     // Combine all context
-    const allContext = [emailContext, discordContext].filter(Boolean).join('\n\n===\n\n');
+    const allContext = [emailContext, discordContext, slackContext].filter(Boolean).join('\n\n===\n\n');
 
     // Create the AI prompt with matched messages
     const systemPrompt = `You are a helpful AI assistant that helps users search and understand their conversations across email and Discord.
@@ -404,12 +441,21 @@ ${allContext
       url: m.url
     }));
 
-    const allSources = [...gmailSources, ...discordSources];
+    const slackSources = slackMessages.slice(0, 5).map(m => ({
+      platform: 'slack',
+      title: `#${m.channelName}`,
+      from: 'Slack',
+      date: m.timestamp,
+      url: ''
+    }));
+
+    const allSources = [...gmailSources, ...discordSources, ...slackSources];
 
     // Determine which services had results
     const servicesWithResults: string[] = [];
     if (gmailMessages.length > 0) servicesWithResults.push('gmail');
     if (discordMessages.length > 0) servicesWithResults.push('discord');
+    if (slackMessages.length > 0) servicesWithResults.push('slack');
 
     res.json({
       response: aiResponse,
@@ -417,7 +463,8 @@ ${allContext
       connectedServices: servicesWithResults,
       searchResults: {
         gmail: gmailMessages.slice(0, 5),
-        discord: discordMessages.slice(0, 5)
+        discord: discordMessages.slice(0, 5),
+        slack: slackMessages.slice(0, 5)
       },
       hasRelevantSources: allSources.length > 0
     });
