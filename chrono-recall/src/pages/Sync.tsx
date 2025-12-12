@@ -21,7 +21,7 @@ const PLATFORMS = [
 const Sync = () => {
   const { user } = useUser();
   const userId = user?.id || 'guest';
-  
+
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<Record<string, string>>({});

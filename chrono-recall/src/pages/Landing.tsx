@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ArrowRight, Send, Mail, MessageSquare, Check, Sparkles, Hash, Loader2, CheckCircle, Lock, Twitter, Facebook, Instagram, Key } from "lucide-react";
+import { Search, ArrowRight, Send, Mail, MessageSquare, Check, Sparkles, Hash, Loader2, CheckCircle, Lock, Twitter, Facebook, Instagram } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "@/assets/logo.png";
@@ -26,7 +26,7 @@ const MCP_SERVERS = [
 const Landing = () => {
   const { user, isAuthenticated } = useUser();
   const userId = user?.id || 'guest';
-  
+
   const [query, setQuery] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [connectedServices, setConnectedServices] = useState<string[]>([]);
@@ -42,7 +42,7 @@ const Landing = () => {
         setIsLoading(false);
         return;
       }
-      
+
       try {
         const status = await getUserStatus(userId);
         setConnectedServices(status.connectedServices || []);
@@ -100,7 +100,7 @@ const Landing = () => {
       navigate('/login');
       return;
     }
-    
+
     setIsConnecting(true);
     if (platformId === 'gmail') {
       connectGmail(userId);
@@ -573,52 +573,6 @@ const Landing = () => {
             </motion.div>
           </div>
 
-          {/* API Access Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-50px" }}
-            transition={{ delay: 0.3, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="max-w-3xl mx-auto"
-          >
-            <div className="glass-card-strong p-8 border border-primary/20">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-                  <Key className="w-7 h-7 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-display font-medium">API Access</h3>
-                  <p className="text-muted-foreground">Build your own integrations</p>
-                </div>
-              </div>
-              <p className="text-muted-foreground mb-6 font-body">
-                Get programmatic access to RecallJump's AI-powered memory search. Perfect for developers building custom workflows and integrations.
-              </p>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50">
-                  <Check className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-body">RESTful API</span>
-                </div>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50">
-                  <Check className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-body">Webhook support</span>
-                </div>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50">
-                  <Check className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-body">SDKs available</span>
-                </div>
-              </div>
-              <div className="mt-6 flex items-center gap-4">
-                <Link to="/settings">
-                  <Button className="bg-gradient-to-r from-primary to-accent">
-                    <Key className="w-4 h-4 mr-2" />
-                    Get API Key
-                  </Button>
-                </Link>
-                <Button variant="outline">View Documentation</Button>
-              </div>
-            </div>
-          </motion.div>
         </div>
       </section>
 

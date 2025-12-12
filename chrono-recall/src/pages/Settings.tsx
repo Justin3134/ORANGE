@@ -15,10 +15,6 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
-  Key,
-  Eye,
-  EyeOff,
-  Copy,
   Lock,
   Trash2,
   Download,
@@ -40,7 +36,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { user, logout } = useUser();
   const userId = user?.id || 'guest';
-  
+
   const [darkMode, setDarkMode] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
   const [notifications, setNotifications] = useState(true);
@@ -60,12 +56,6 @@ const Settings = () => {
   const [dataRetention, setDataRetention] = useState("1year");
   const [shareAnalytics, setShareAnalytics] = useState(true);
   const [encryptData, setEncryptData] = useState(true);
-
-  // API Key state
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [apiKey, setApiKey] = useState("rj_sk_" + Math.random().toString(36).substring(2, 15));
-  const [showKey, setShowKey] = useState(false);
-  const [copiedKey, setCopiedKey] = useState(false);
 
   // Discord state
   const [discordUsername, setDiscordUsername] = useState<string | null>(null);
@@ -114,10 +104,6 @@ const Settings = () => {
     // Load profile
     const savedName = localStorage.getItem('profileName');
     if (savedName) setProfileName(savedName);
-
-    // Load API key if exists
-    const savedApiKey = localStorage.getItem('apiKey');
-    if (savedApiKey) setApiKey(savedApiKey);
   }, []);
 
   // Handle dark mode toggle
@@ -194,20 +180,6 @@ const Settings = () => {
     setShowProfileEdit(false);
   };
 
-  // Copy API key
-  const handleCopyApiKey = () => {
-    navigator.clipboard.writeText(apiKey);
-    setCopiedKey(true);
-    setTimeout(() => setCopiedKey(false), 2000);
-  };
-
-  // Generate new API key
-  const handleGenerateApiKey = () => {
-    const newKey = "rj_sk_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    setApiKey(newKey);
-    localStorage.setItem('apiKey', newKey);
-  };
-
   return (
     <div className={cn("min-h-screen transition-colors duration-300", darkMode ? "bg-[#0a0a0a]" : "bg-background")}>
       {/* Header */}
@@ -269,67 +241,6 @@ const Settings = () => {
               </div>
             </div>
             <Button variant="outline" onClick={() => setShowProfileEdit(true)}>Edit Profile</Button>
-          </div>
-        </motion.div>
-
-        {/* API Key Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="mb-8"
-        >
-          <h3 className={cn("text-sm font-medium mb-4", darkMode ? "text-white/60" : "text-muted-foreground")}>API Access</h3>
-          <div className={cn(
-            "rounded-2xl border backdrop-blur-xl overflow-hidden",
-            darkMode ? "bg-white/5 border-white/10" : "glass-card"
-          )}>
-            <div className="p-5">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-                  <Key className="w-6 h-6 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <h4 className={cn("font-semibold", darkMode ? "text-white" : "text-foreground")}>API Key</h4>
-                  <p className={cn("text-sm", darkMode ? "text-white/60" : "text-muted-foreground")}>Use this key to access RecallJump API</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setShowApiKey(!showApiKey)}>
-                  {showApiKey ? 'Hide' : 'Manage'}
-                </Button>
-              </div>
-
-              <AnimatePresence>
-                {showApiKey && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="pt-4 border-t border-border/50"
-                  >
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className={cn(
-                        "flex-1 px-4 py-3 rounded-lg font-mono text-sm",
-                        darkMode ? "bg-black/50 text-white/80" : "bg-secondary/50"
-                      )}>
-                        {showKey ? apiKey : '•'.repeat(apiKey.length)}
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => setShowKey(!showKey)}>
-                        {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={handleCopyApiKey}>
-                        {copiedKey ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={handleGenerateApiKey}>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Regenerate Key
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
           </div>
         </motion.div>
 

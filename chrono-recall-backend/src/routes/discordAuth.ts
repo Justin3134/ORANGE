@@ -156,11 +156,11 @@ export const handleDiscordCallback = async (req: Request, res: Response) => {
 
   if (error) {
     console.error('Discord OAuth error:', error);
-    return res.redirect(`${config.frontendUrl}/dashboard?discord_error=${error}`);
+    return res.redirect(`${config.frontendUrl}/login?discord_error=${error}`);
   }
 
   if (!code || !userId) {
-    return res.redirect(`${config.frontendUrl}/dashboard?discord_error=missing_params`);
+    return res.redirect(`${config.frontendUrl}/login?discord_error=missing_params`);
   }
 
   try {
@@ -204,26 +204,36 @@ export const handleDiscordCallback = async (req: Request, res: Response) => {
 
     const guilds = guildsResponse.ok ? await guildsResponse.json() : [];
 
+    // Create email-like identifier for Discord users
+    const discordEmail = `${userInfo.username}@discord.user`;
+    const finalUserId = discordEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
     // Store Discord connection info for the user
-    discordTokenStore.set(userId as string, {
+    discordTokenStore.set(finalUserId, {
       discordUserId: userInfo.id,
       discordUsername: userInfo.username,
       discriminator: userInfo.discriminator,
       avatar: userInfo.avatar,
+      email: discordEmail,
       guilds: guilds.map((g: any) => g.id),
       guildNames: guilds.map((g: any) => g.name),
       connectedAt: new Date().toISOString(),
     });
     saveDiscordTokens(discordTokenStore);
 
-    console.log(`✅ Discord connected for user ${userId} (Discord: ${userInfo.username})`);
+    console.log(`✅ Discord connected for user ${finalUserId} (Discord: ${userInfo.username})`);
     console.log(`   User is in ${guilds.length} server(s)`);
 
-    // Redirect to frontend with success and bot invite prompt
-    res.redirect(`${config.frontendUrl}/dashboard?discord_connected=true`);
+    // Redirect to frontend with success and user info
+    const redirectUrl = new URL(`${config.frontendUrl}/login`);
+    redirectUrl.searchParams.set('discord_connected', 'true');
+    redirectUrl.searchParams.set('email', discordEmail);
+    redirectUrl.searchParams.set('name', userInfo.username);
+
+    res.redirect(redirectUrl.toString());
   } catch (err: any) {
     console.error('Discord OAuth token exchange error:', err);
-    res.redirect(`${config.frontendUrl}/dashboard?discord_error=token_exchange_failed`);
+    res.redirect(`${config.frontendUrl}/login?discord_error=token_exchange_failed`);
   }
 };
 

@@ -1,45 +1,54 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Brain, Mail, ArrowRight, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Brain, Mail, MessageSquare, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useUser } from "@/contexts/UserContext";
+import { connectGmail, connectDiscord } from "@/lib/api";
 import { toast } from "sonner";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useUser();
+  const [isConnecting, setIsConnecting] = useState<string | null>(null);
+  const { login, isAuthenticated } = useUser();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!email.trim()) {
-      toast.error("Please enter your email");
-      return;
-    }
+  // Handle OAuth callback
+  useEffect(() => {
+    const gmailConnected = searchParams.get('gmail_connected');
+    const discordConnected = searchParams.get('discord_connected');
+    const userEmail = searchParams.get('email');
+    const userName = searchParams.get('name');
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast.error("Please enter a valid email");
-      return;
-    }
-
-    setIsLoading(true);
-    
-    try {
-      // Login the user
-      login(email, name || undefined);
-      toast.success("Welcome to Chrono Recall!");
+    if (gmailConnected === 'true' && userEmail) {
+      // User successfully connected Gmail - log them in
+      login(userEmail, userName || undefined);
+      toast.success("Successfully signed in with Gmail!");
       navigate("/dashboard");
-    } catch (error) {
-      toast.error("Failed to sign in. Please try again.");
-    } finally {
-      setIsLoading(false);
+    } else if (discordConnected === 'true' && userEmail) {
+      // User successfully connected Discord - log them in
+      login(userEmail, userName || undefined);
+      toast.success("Successfully signed in with Discord!");
+      navigate("/dashboard");
     }
+  }, [searchParams, login, navigate]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/dashboard");
+    }
+  }, [isAuthenticated, navigate]);
+
+  const handleGmailLogin = () => {
+    setIsConnecting('gmail');
+    // Use a temporary guest ID - backend will create real user after OAuth
+    connectGmail('new_user');
+  };
+
+  const handleDiscordLogin = () => {
+    setIsConnecting('discord');
+    // Use a temporary guest ID - backend will create real user after OAuth
+    connectDiscord('new_user');
   };
 
   return (
@@ -56,7 +65,7 @@ const Login = () => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl mb-4">
             <Brain className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Chrono Recall</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Recall Jump</h1>
           <p className="text-gray-400">Your AI-powered memory assistant</p>
         </div>
 
@@ -64,59 +73,45 @@ const Login = () => {
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
           <div className="flex items-center gap-2 mb-6">
             <Sparkles className="w-5 h-5 text-purple-400" />
-            <h2 className="text-xl font-semibold text-white">Get Started</h2>
+            <h2 className="text-xl font-semibold text-white">Sign In</h2>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Your Name (optional)
-              </label>
-              <Input
-                type="text"
-                placeholder="John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="bg-white/10 border-white/20 text-white placeholder:text-gray-500"
-              />
-            </div>
+          <p className="text-gray-300 mb-6">
+            Connect your email or messaging platform to get started. This will be your login and allow AI to search your messages.
+          </p>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-500"
-                  required
-                />
-              </div>
-            </div>
-
+          <div className="space-y-4">
+            {/* Gmail Login */}
             <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-6"
+              onClick={handleGmailLogin}
+              disabled={isConnecting !== null}
+              className="w-full bg-white hover:bg-gray-100 text-gray-900 py-6 text-lg"
             >
-              {isLoading ? (
-                "Signing in..."
+              {isConnecting === 'gmail' ? (
+                <Loader2 className="w-5 h-5 mr-3 animate-spin" />
               ) : (
-                <>
-                  Continue
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </>
+                <Mail className="w-5 h-5 mr-3 text-red-500" />
               )}
+              Continue with Gmail
             </Button>
-          </form>
+
+            {/* Discord Login */}
+            <Button
+              onClick={handleDiscordLogin}
+              disabled={isConnecting !== null}
+              className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white py-6 text-lg"
+            >
+              {isConnecting === 'discord' ? (
+                <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+              ) : (
+                <MessageSquare className="w-5 h-5 mr-3" />
+              )}
+              Continue with Discord
+            </Button>
+          </div>
 
           <p className="text-center text-gray-400 text-sm mt-6">
-            By continuing, you agree to connect your email and messaging
-            platforms to enable AI-powered search.
+            By signing in, you authorize RecallJump to access your messages for AI-powered search.
           </p>
         </div>
 

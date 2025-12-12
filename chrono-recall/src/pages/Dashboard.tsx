@@ -17,7 +17,7 @@ import { useUser } from "@/contexts/UserContext";
 const Dashboard = () => {
   const { user } = useUser();
   const userId = user?.id || 'guest';
-  
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResult, setSelectedResult] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);

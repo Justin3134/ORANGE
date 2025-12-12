@@ -96,11 +96,11 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
 
   if (error) {
     console.error('OAuth error:', error);
-    return res.redirect(`${config.frontendUrl}/dashboard?gmail_error=${error}`);
+    return res.redirect(`${config.frontendUrl}/login?gmail_error=${error}`);
   }
 
   if (!code || !userId) {
-    return res.redirect(`${config.frontendUrl}/dashboard?gmail_error=missing_params`);
+    return res.redirect(`${config.frontendUrl}/login?gmail_error=missing_params`);
   }
 
   try {
@@ -108,21 +108,38 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
 
     // Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code as string);
+    oauth2Client.setCredentials(tokens);
 
-    // Store tokens for the user
-    tokenStore.set(userId as string, {
+    // Fetch user info from Google
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const userInfo = await oauth2.userinfo.get();
+    const userEmail = userInfo.data.email || '';
+    const userName = userInfo.data.name || userInfo.data.given_name || '';
+
+    // Use email as the userId for proper user isolation
+    const finalUserId = userEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    // Store tokens for the user (using email-based ID)
+    tokenStore.set(finalUserId, {
       ...tokens,
+      email: userEmail,
+      name: userName,
       connectedAt: new Date().toISOString()
     });
     saveTokens(tokenStore); // Persist to file
 
-    console.log(`Gmail connected for user ${userId}`);
+    console.log(`Gmail connected for user ${finalUserId} (${userEmail})`);
 
-    // Redirect back to frontend with success
-    res.redirect(`${config.frontendUrl}/dashboard?gmail_connected=true`);
+    // Redirect back to frontend with success and user info
+    const redirectUrl = new URL(`${config.frontendUrl}/login`);
+    redirectUrl.searchParams.set('gmail_connected', 'true');
+    redirectUrl.searchParams.set('email', userEmail);
+    redirectUrl.searchParams.set('name', userName);
+
+    res.redirect(redirectUrl.toString());
   } catch (err: any) {
     console.error('OAuth token exchange error:', err);
-    res.redirect(`${config.frontendUrl}/dashboard?gmail_error=token_exchange_failed`);
+    res.redirect(`${config.frontendUrl}/login?gmail_error=token_exchange_failed`);
   }
 };
 
