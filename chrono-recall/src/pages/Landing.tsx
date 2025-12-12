@@ -95,17 +95,12 @@ const Landing = () => {
   };
 
   const handleConnect = (platformId: string) => {
-    // If not logged in, redirect to login first
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-
+    // Start OAuth directly - this IS the login
     setIsConnecting(true);
     if (platformId === 'gmail') {
-      connectGmail(userId);
+      connectGmail('new_user');
     } else if (platformId === 'discord') {
-      connectDiscord(userId);
+      connectDiscord('new_user');
     }
   };
 
@@ -146,7 +141,7 @@ const Landing = () => {
                 </Link>
               </>
             ) : (
-              <Link to="/login">
+              <Link to="/dashboard">
                 <Button size="sm" className="bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow font-body text-base px-6">
                   Get Started
                 </Button>
