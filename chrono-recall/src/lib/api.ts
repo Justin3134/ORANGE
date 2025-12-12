@@ -101,6 +101,55 @@ export async function disconnectDiscord(userId: string = DEFAULT_USER_ID) {
   return res.json();
 }
 
+// Slack API functions
+export async function connectSlack(userId: string = DEFAULT_USER_ID) {
+  // Redirect to Slack OAuth
+  window.location.href = `${BACKEND_URL}/auth/slack?userId=${userId}`;
+}
+
+export async function getSlackStatus(userId: string = DEFAULT_USER_ID) {
+  const res = await fetch(`${BACKEND_URL}/auth/slack/status?userId=${userId}`);
+
+  if (!res.ok) {
+    throw new Error("Failed to get Slack status");
+  }
+
+  return res.json();
+}
+
+export async function syncSlack(userId: string = DEFAULT_USER_ID) {
+  const res = await fetch(`${BACKEND_URL}/api/sync-slack`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ userId }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.error || "Slack sync failed");
+  }
+
+  return res.json();
+}
+
+export async function disconnectSlack(userId: string = DEFAULT_USER_ID) {
+  const res = await fetch(`${BACKEND_URL}/auth/slack/disconnect`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ userId }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to disconnect Slack");
+  }
+
+  return res.json();
+}
+
 export async function syncGmail(userId: string = DEFAULT_USER_ID) {
   const res = await fetch(`${BACKEND_URL}/api/sync-gmail`, {
     method: "POST",

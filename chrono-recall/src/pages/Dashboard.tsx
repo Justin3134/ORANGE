@@ -49,13 +49,15 @@ const Dashboard = () => {
   useEffect(() => {
     const gmailConnectedParam = searchParams.get('gmail_connected');
     const discordConnectedParam = searchParams.get('discord_connected');
+    const slackConnectedParam = searchParams.get('slack_connected');
     const email = searchParams.get('email');
     const name = searchParams.get('name');
 
-    if ((gmailConnectedParam === 'true' || discordConnectedParam === 'true') && email) {
+    if ((gmailConnectedParam === 'true' || discordConnectedParam === 'true' || slackConnectedParam === 'true') && email) {
       // Auto-login the user from OAuth
       login(email, name || undefined);
-      toast.success(`Successfully connected ${gmailConnectedParam ? 'Gmail' : 'Discord'}!`);
+      const service = gmailConnectedParam ? 'Gmail' : discordConnectedParam ? 'Discord' : 'Slack';
+      toast.success(`Successfully connected ${service}!`);
 
       if (gmailConnectedParam) {
         setGmailConnected(true);
@@ -64,6 +66,10 @@ const Dashboard = () => {
       }
       if (discordConnectedParam) {
         setConnectedPlatforms(prev => [...new Set([...prev, 'discord'])]);
+        setHasSyncedData(true);
+      }
+      if (slackConnectedParam) {
+        setConnectedPlatforms(prev => [...new Set([...prev, 'slack'])]);
         setHasSyncedData(true);
       }
 
@@ -87,6 +93,10 @@ const Dashboard = () => {
         }
         if (status.connectedServices?.includes('discord')) {
           setConnectedPlatforms(prev => [...new Set([...prev, 'discord'])]);
+          setHasSyncedData(true);
+        }
+        if (status.connectedServices?.includes('slack')) {
+          setConnectedPlatforms(prev => [...new Set([...prev, 'slack'])]);
           setHasSyncedData(true);
         }
       } catch (err) {

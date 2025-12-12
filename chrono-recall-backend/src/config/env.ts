@@ -29,6 +29,14 @@ export const config = {
     botPermissions: process.env.DISCORD_BOT_PERMISSIONS || '537259072', // Read messages + history
   },
 
+  // Slack OAuth + Bot Configuration
+  slack: {
+    clientId: process.env.SLACK_CLIENT_ID || '',
+    clientSecret: process.env.SLACK_CLIENT_SECRET || '',
+    signingSecret: process.env.SLACK_SIGNING_SECRET || '',
+    redirectUri: process.env.SLACK_REDIRECT_URI || 'http://localhost:4000/auth/slack/callback',
+  },
+
   // OpenAI Configuration
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',

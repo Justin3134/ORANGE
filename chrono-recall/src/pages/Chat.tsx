@@ -26,7 +26,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
-import { sendChatMessage, getUserStatus, connectGmail, connectDiscord } from "@/lib/api";
+import { sendChatMessage, getUserStatus, connectGmail, connectDiscord, connectSlack } from "@/lib/api";
 import { useUser } from "@/contexts/UserContext";
 
 interface Message {
@@ -47,7 +47,7 @@ interface Conversation {
 const MCP_SERVERS = [
   { id: 'gmail', name: 'Gmail', icon: Mail, color: 'text-red-500', available: true },
   { id: 'discord', name: 'Discord', icon: MessageSquare, color: 'text-indigo-500', available: true },
-  { id: 'slack', name: 'Slack', icon: Hash, color: 'text-purple-500', available: false },
+  { id: 'slack', name: 'Slack', icon: Hash, color: 'text-purple-500', available: true },
   { id: 'twitter', name: 'X (Twitter)', icon: MessageSquare, color: 'text-blue-400', available: false },
   { id: 'facebook', name: 'Facebook', icon: MessageSquare, color: 'text-blue-600', available: false },
   { id: 'instagram', name: 'Instagram', icon: MessageSquare, color: 'text-pink-500', available: false },
@@ -202,6 +202,8 @@ const Chat = () => {
       connectGmail(userId);
     } else if (platformId === 'discord') {
       connectDiscord(userId);
+    } else if (platformId === 'slack') {
+      connectSlack(userId);
     }
   };
 

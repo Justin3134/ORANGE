@@ -9,7 +9,7 @@ import {
   ONBOARDING_STEPS,
   fadeUpVariants,
 } from "@/config/constants";
-import { getUserStatus, getRecentMemories, connectGmail, connectDiscord } from "@/lib/api";
+import { getUserStatus, getRecentMemories, connectGmail, connectDiscord, connectSlack } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/contexts/UserContext";
 
@@ -17,7 +17,7 @@ import { useUser } from "@/contexts/UserContext";
 const MCP_SERVERS = [
   { id: 'gmail', name: 'Gmail', icon: Mail, color: 'from-red-500/20 to-red-600/10', iconColor: 'text-red-500', description: 'Search your emails', available: true },
   { id: 'discord', name: 'Discord', icon: MessageSquare, color: 'from-indigo-500/20 to-indigo-600/10', iconColor: 'text-indigo-500', description: 'Search server messages', available: true },
-  { id: 'slack', name: 'Slack', icon: Hash, color: 'from-purple-500/20 to-purple-600/10', iconColor: 'text-purple-500', description: 'Index workspace chats', available: false },
+  { id: 'slack', name: 'Slack', icon: Hash, color: 'from-purple-500/20 to-purple-600/10', iconColor: 'text-purple-500', description: 'Index workspace chats', available: true },
   { id: 'twitter', name: 'X (Twitter)', icon: Twitter, color: 'from-blue-400/20 to-blue-500/10', iconColor: 'text-blue-400', description: 'Find tweets & DMs', available: false },
   { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'from-pink-500/20 to-pink-600/10', iconColor: 'text-pink-500', description: 'Search messages', available: false },
   { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'from-blue-600/20 to-blue-700/10', iconColor: 'text-blue-600', description: 'Messenger & posts', available: false },
@@ -101,6 +101,8 @@ const Landing = () => {
       connectGmail('new_user');
     } else if (platformId === 'discord') {
       connectDiscord('new_user');
+    } else if (platformId === 'slack') {
+      connectSlack('new_user');
     }
   };
 
@@ -586,9 +588,9 @@ const Landing = () => {
             </div>
 
             <div className="flex items-center gap-10 text-base text-muted-foreground font-body">
-              <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-              <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-              <a href="#" className="hover:text-foreground transition-colors">Contact</a>
+              <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+              <a href="mailto:support@recalljump.com" className="hover:text-foreground transition-colors">Contact</a>
             </div>
 
             <p className="text-base text-muted-foreground font-body">

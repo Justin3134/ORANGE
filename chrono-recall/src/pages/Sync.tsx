@@ -5,14 +5,14 @@ import { ArrowLeft, RefreshCw, CheckCircle, Clock, Sparkles, User, Mail, Hash, M
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_ITEMS, SYNC_ACTIVITY } from "@/config/constants";
-import { connectGmail, connectDiscord, syncGmail, syncDiscord, getUserStatus } from "@/lib/api";
+import { connectGmail, connectDiscord, connectSlack, syncGmail, syncDiscord, syncSlack, getUserStatus } from "@/lib/api";
 import { useUser } from "@/contexts/UserContext";
 
 // Extended platform list
 const PLATFORMS = [
   { id: 'gmail', name: 'Gmail', icon: Mail, color: 'from-red-500/20 to-red-600/10', iconColor: 'text-red-500 bg-red-500/10', description: 'Sync your emails and attachments', available: true },
   { id: 'discord', name: 'Discord', icon: MessageSquare, color: 'from-indigo-500/20 to-indigo-600/10', iconColor: 'text-indigo-500 bg-indigo-500/10', description: 'Search server messages and DMs', available: true },
-  { id: 'slack', name: 'Slack', icon: Hash, color: 'from-purple-500/20 to-purple-600/10', iconColor: 'text-purple-500 bg-purple-500/10', description: 'Index your workspace conversations', available: false },
+  { id: 'slack', name: 'Slack', icon: Hash, color: 'from-purple-500/20 to-purple-600/10', iconColor: 'text-purple-500 bg-purple-500/10', description: 'Index your workspace conversations', available: true },
   { id: 'twitter', name: 'X (Twitter)', icon: Twitter, color: 'from-blue-400/20 to-blue-500/10', iconColor: 'text-blue-400 bg-blue-400/10', description: 'Find tweets, replies, and DMs', available: false },
   { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'from-blue-600/20 to-blue-700/10', iconColor: 'text-blue-600 bg-blue-600/10', description: 'Messenger conversations and posts', available: false },
   { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'from-pink-500/20 to-pink-600/10', iconColor: 'text-pink-500 bg-pink-500/10', description: 'Direct messages and comments', available: false },
@@ -54,6 +54,10 @@ const Sync = () => {
       setConnectedPlatforms(prev => [...new Set([...prev, 'discord'])]);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    if (urlParams.get('slack_connected') === 'true') {
+      setConnectedPlatforms(prev => [...new Set([...prev, 'slack'])]);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
   const handleConnect = async (platformId: string) => {
@@ -61,6 +65,8 @@ const Sync = () => {
       connectGmail(userId);
     } else if (platformId === 'discord') {
       connectDiscord(userId);
+    } else if (platformId === 'slack') {
+      connectSlack(userId);
     } else {
       // Mock connect for other platforms
       setConnectedPlatforms(prev => [...prev, platformId]);
@@ -84,6 +90,9 @@ const Sync = () => {
       } else if (platformId === 'discord') {
         const result = await syncDiscord(userId);
         setMemoriesCount(prev => prev + (result.synced || 0));
+      } else if (platformId === 'slack') {
+        const result = await syncSlack(userId);
+        setMemoriesCount(prev => prev + (result.messagesCount || 0));
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
       setLastSync(prev => ({ ...prev, [platformId]: 'Just now' }));
@@ -94,6 +103,8 @@ const Sync = () => {
           connectGmail(userId);
         } else if (platformId === 'discord') {
           connectDiscord(userId);
+        } else if (platformId === 'slack') {
+          connectSlack(userId);
         }
       } else if (error.message?.includes('bot')) {
         // Bot not in server - show invite

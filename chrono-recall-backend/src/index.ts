@@ -26,6 +26,14 @@ import {
   isDiscordConnected,
   initializeDiscordBot
 } from './routes/discordAuth';
+import {
+  initiateSlackOAuth,
+  handleSlackCallback,
+  getSlackStatus,
+  disconnectSlack,
+  isSlackConnected,
+  syncSlackHandler
+} from './routes/slackAuth';
 import { handleChat, getRecentEmails } from './routes/chat';
 
 const app = express();
@@ -58,6 +66,12 @@ app.get('/auth/discord/status', getDiscordStatus);
 app.get('/auth/discord/bot-invite', getBotInviteLink);
 app.post('/auth/discord/disconnect', disconnectDiscord);
 
+// Slack OAuth routes
+app.get('/auth/slack', initiateSlackOAuth);
+app.get('/auth/slack/callback', handleSlackCallback);
+app.get('/auth/slack/status', getSlackStatus);
+app.post('/auth/slack/disconnect', disconnectSlack);
+
 // Integration routes
 app.get('/integrations', getIntegrations);
 
@@ -66,6 +80,9 @@ app.post('/api/sync-gmail', syncGmailMessages);
 
 // Discord sync route
 app.post('/api/sync-discord', syncDiscordMessages);
+
+// Slack sync route
+app.post('/api/sync-slack', syncSlackHandler);
 
 // Chat endpoint - AI-powered chat with email context
 app.post('/api/chat', handleChat);
@@ -89,6 +106,10 @@ app.get('/api/user/status', (req: Request, res: Response) => {
 
   if (isDiscordConnected(userId)) {
     connectedServices.push('discord');
+  }
+
+  if (isSlackConnected(userId)) {
+    connectedServices.push('slack');
   }
 
   res.json({
@@ -171,5 +192,17 @@ app.listen(config.port, async () => {
     } else {
       console.log('⚠️  Discord bot token not set, bot will not start');
     }
+  }
+
+  // Check if Slack is configured
+  if (!config.slack.clientId || !config.slack.clientSecret) {
+    console.log('\n⚠️  Slack OAuth not configured!');
+    console.log('   Set these environment variables:');
+    console.log('   - SLACK_CLIENT_ID');
+    console.log('   - SLACK_CLIENT_SECRET');
+    console.log('   - SLACK_REDIRECT_URI (optional, defaults to http://localhost:4000/auth/slack/callback)\n');
+  } else {
+    console.log('✅ Slack OAuth configured');
+    console.log(`   Redirect URI: ${config.slack.redirectUri}`);
   }
 });
