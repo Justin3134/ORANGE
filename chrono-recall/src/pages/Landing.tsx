@@ -11,6 +11,7 @@ import {
 } from "@/config/constants";
 import { getUserStatus, getRecentMemories, connectGmail, connectDiscord } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/contexts/UserContext";
 
 // Available MCP servers/platforms
 const MCP_SERVERS = [
@@ -23,6 +24,9 @@ const MCP_SERVERS = [
 ];
 
 const Landing = () => {
+  const { user, isAuthenticated } = useUser();
+  const userId = user?.id || 'guest';
+  
   const [query, setQuery] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [connectedServices, setConnectedServices] = useState<string[]>([]);
@@ -34,12 +38,17 @@ const Landing = () => {
   // Check user status and recent memories on mount
   useEffect(() => {
     const checkStatus = async () => {
+      if (!isAuthenticated) {
+        setIsLoading(false);
+        return;
+      }
+      
       try {
-        const status = await getUserStatus();
+        const status = await getUserStatus(userId);
         setConnectedServices(status.connectedServices || []);
 
         if (status.memoriesCount > 0) {
-          const memories = await getRecentMemories("justin", 3);
+          const memories = await getRecentMemories(userId, 3);
           setRecentMemories(memories.memories || []);
         }
       } catch (err) {
@@ -61,7 +70,7 @@ const Landing = () => {
     }
 
     checkStatus();
-  }, []);
+  }, [isAuthenticated, userId]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,11 +95,17 @@ const Landing = () => {
   };
 
   const handleConnect = (platformId: string) => {
+    // If not logged in, redirect to login first
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    
     setIsConnecting(true);
     if (platformId === 'gmail') {
-      connectGmail();
+      connectGmail(userId);
     } else if (platformId === 'discord') {
-      connectDiscord();
+      connectDiscord(userId);
     }
   };
 
@@ -119,14 +134,24 @@ const Landing = () => {
             <button onClick={scrollToPricing} className="text-muted-foreground hover:text-foreground font-body text-base transition-colors">
               Pricing
             </button>
-            <Link to="/dashboard">
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground font-body text-base">Dashboard</Button>
-            </Link>
-            <Link to="/chat">
-              <Button size="sm" className="bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow font-body text-base px-6">
-                Get Started
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <Link to="/dashboard">
+                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground font-body text-base">Dashboard</Button>
+                </Link>
+                <Link to="/chat">
+                  <Button size="sm" className="bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow font-body text-base px-6">
+                    Chat
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <Link to="/login">
+                <Button size="sm" className="bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow font-body text-base px-6">
+                  Get Started
+                </Button>
+              </Link>
+            )}
           </motion.div>
         </div>
       </nav>

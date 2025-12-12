@@ -34,9 +34,13 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { getUserStatus, disconnectService, connectGmail, connectDiscord, getDiscordStatus, disconnectDiscord } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/contexts/UserContext";
 
 const Settings = () => {
   const navigate = useNavigate();
+  const { user, logout } = useUser();
+  const userId = user?.id || 'guest';
+  
   const [darkMode, setDarkMode] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
   const [notifications, setNotifications] = useState(true);
@@ -47,8 +51,8 @@ const Settings = () => {
 
   // Profile edit state
   const [showProfileEdit, setShowProfileEdit] = useState(false);
-  const [profileName, setProfileName] = useState("User");
-  const [profileEmail, setProfileEmail] = useState("justin.07823@gmail.com");
+  const [profileName, setProfileName] = useState(user?.name || "User");
+  const [profileEmail, setProfileEmail] = useState(user?.email || "");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Privacy settings state
@@ -74,14 +78,14 @@ const Settings = () => {
   useEffect(() => {
     const loadStatus = async () => {
       try {
-        const status = await getUserStatus();
+        const status = await getUserStatus(userId);
         setConnectedServices(status.connectedServices || []);
         setMemoriesCount(status.memoriesCount || 0);
 
         // Load Discord-specific status if connected
         if (status.connectedServices?.includes('discord')) {
           try {
-            const discordStatus = await getDiscordStatus();
+            const discordStatus = await getDiscordStatus(userId);
             setDiscordUsername(discordStatus.discordUsername);
             setDiscordServerCount(discordStatus.serverCount || 0);
             setDiscordBotOnline(discordStatus.botOnline || false);
@@ -151,11 +155,11 @@ const Settings = () => {
     setIsDisconnecting(true);
     try {
       if (service === 'discord') {
-        await disconnectDiscord("justin");
+        await disconnectDiscord(userId);
         setDiscordUsername(null);
         setDiscordServerCount(0);
       } else {
-        await disconnectService("justin", service);
+        await disconnectService(userId, service);
       }
       setConnectedServices(prev => prev.filter(s => s !== service));
       setMemoriesCount(0);
@@ -177,7 +181,7 @@ const Settings = () => {
 
   // Handle sign out
   const handleSignOut = () => {
-    localStorage.clear();
+    logout();
     navigate('/');
   };
 
@@ -252,8 +256,8 @@ const Settings = () => {
               </button>
             </div>
             <div className="flex-1">
-              <h2 className={cn("text-xl font-semibold", darkMode ? "text-white" : "text-foreground")}>{profileName}</h2>
-              <p className={darkMode ? "text-white/60" : "text-muted-foreground"}>{profileEmail}</p>
+              <h2 className={cn("text-xl font-semibold", darkMode ? "text-white" : "text-foreground")}>{user?.name || profileName}</h2>
+              <p className={darkMode ? "text-white/60" : "text-muted-foreground"}>{user?.email || profileEmail}</p>
               <div className="flex items-center gap-2 mt-2">
                 <span className="flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
                   <Sparkles className="w-3 h-3" />
@@ -369,7 +373,7 @@ const Settings = () => {
                   </Button>
                 </div>
               ) : (
-                <Button size="sm" onClick={() => connectGmail()}>
+                <Button size="sm" onClick={() => connectGmail(userId)}>
                   Connect
                 </Button>
               )}
@@ -414,7 +418,7 @@ const Settings = () => {
                   </Button>
                 </div>
               ) : (
-                <Button size="sm" onClick={() => connectDiscord()} className="bg-indigo-500 hover:bg-indigo-600">
+                <Button size="sm" onClick={() => connectDiscord(userId)} className="bg-indigo-500 hover:bg-indigo-600">
                   Connect
                 </Button>
               )}

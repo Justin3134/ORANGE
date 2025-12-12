@@ -12,8 +12,12 @@ import {
   SYNC_INTEGRATIONS,
 } from "@/config/constants";
 import { Mail } from "lucide-react";
+import { useUser } from "@/contexts/UserContext";
 
 const Dashboard = () => {
+  const { user } = useUser();
+  const userId = user?.id || 'guest';
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResult, setSelectedResult] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -30,7 +34,7 @@ const Dashboard = () => {
   const fetchRecentMemories = async () => {
     setIsLoadingMemories(true);
     try {
-      const data = await getRecentMemories("justin", 5);
+      const data = await getRecentMemories(userId, 5);
       setRecentMemories(data.memories || []);
     } catch (err) {
       console.error("Failed to fetch recent memories:", err);
@@ -43,7 +47,7 @@ const Dashboard = () => {
   React.useEffect(() => {
     const checkStatus = async () => {
       try {
-        const status = await getUserStatus("justin");
+        const status = await getUserStatus(userId);
         if (status.connectedServices?.includes('gmail')) {
           setGmailConnected(true);
           setConnectedPlatforms(prev => [...new Set([...prev, 'gmail'])]);
@@ -86,7 +90,7 @@ const Dashboard = () => {
 
     setIsSearching(true);
     try {
-      const data = await searchMemories("justin", query);
+      const data = await searchMemories(userId, query);
       console.log("AI Search results:", data);
 
       // Store AI parsing results
@@ -175,8 +179,8 @@ const Dashboard = () => {
               <User className="w-4 h-4 text-primary-foreground" />
             </div>
             <div className="hidden lg:block">
-              <p className="text-sm font-medium text-foreground">John Doe</p>
-              <p className="text-xs text-muted-foreground">Pro Plan</p>
+              <p className="text-sm font-medium text-foreground">{user?.name || 'User'}</p>
+              <p className="text-xs text-muted-foreground">Free Plan</p>
             </div>
           </div>
         </div>
@@ -208,7 +212,7 @@ const Dashboard = () => {
               className="shrink-0 mr-2"
               onClick={async () => {
                 try {
-                  const data = await syncFake("justin");
+                  const data = await syncFake(userId);
                   console.log("Synced data:", data);
                   setHasSyncedData(true);
                   alert(`Synced ${data.synced} memories from ${data.platforms.join(", ")}`);
@@ -317,25 +321,25 @@ const Dashboard = () => {
                               if (connectedPlatforms.includes('gmail')) {
                                 // Gmail sync
                                 try {
-                                  const data = await syncGmail("justin");
+                                  const data = await syncGmail(userId);
                                   setHasSyncedData(true);
                                   alert(data.message || `Synced ${data.synced} Gmail messages`);
                                 } catch (error: any) {
                                   if (error.message.includes('not authenticated')) {
                                     // Redirect to OAuth
-                                    connectGmail("justin");
+                                    connectGmail(userId);
                                   } else {
                                     alert(`Gmail sync failed: ${error.message}`);
                                   }
                                 }
                               } else {
                                 // Start Gmail OAuth
-                                connectGmail("justin");
+                                connectGmail(userId);
                               }
                             } else if (integration.id === 'discord') {
                               if (!connectedPlatforms.includes('discord')) {
                                 // Start Discord OAuth
-                                connectDiscord("justin");
+                                connectDiscord(userId);
                               }
                             } else {
                               // Other platforms (fake for now)

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_ITEMS, SYNC_ACTIVITY } from "@/config/constants";
 import { connectGmail, connectDiscord, syncGmail, syncDiscord, getUserStatus } from "@/lib/api";
+import { useUser } from "@/contexts/UserContext";
 
 // Extended platform list
 const PLATFORMS = [
@@ -18,6 +19,9 @@ const PLATFORMS = [
 ];
 
 const Sync = () => {
+  const { user } = useUser();
+  const userId = user?.id || 'guest';
+  
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<Record<string, string>>({});
@@ -29,7 +33,7 @@ const Sync = () => {
   useEffect(() => {
     const loadStatus = async () => {
       try {
-        const status = await getUserStatus();
+        const status = await getUserStatus(userId);
         setConnectedPlatforms(status.connectedServices || []);
         setMemoriesCount(status.memoriesCount || 0);
       } catch (err) {
@@ -54,9 +58,9 @@ const Sync = () => {
 
   const handleConnect = async (platformId: string) => {
     if (platformId === 'gmail') {
-      connectGmail("justin");
+      connectGmail(userId);
     } else if (platformId === 'discord') {
-      connectDiscord("justin");
+      connectDiscord(userId);
     } else {
       // Mock connect for other platforms
       setConnectedPlatforms(prev => [...prev, platformId]);
@@ -75,10 +79,10 @@ const Sync = () => {
     setSyncing(platformId);
     try {
       if (platformId === 'gmail') {
-        const result = await syncGmail("justin");
+        const result = await syncGmail(userId);
         setMemoriesCount(prev => prev + (result.synced || 0));
       } else if (platformId === 'discord') {
-        const result = await syncDiscord("justin");
+        const result = await syncDiscord(userId);
         setMemoriesCount(prev => prev + (result.synced || 0));
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -87,9 +91,9 @@ const Sync = () => {
       console.error('Sync error:', error);
       if (error.message?.includes('not authenticated') || error.message?.includes('not connected')) {
         if (platformId === 'gmail') {
-          connectGmail("justin");
+          connectGmail(userId);
         } else if (platformId === 'discord') {
-          connectDiscord("justin");
+          connectDiscord(userId);
         }
       } else if (error.message?.includes('bot')) {
         // Bot not in server - show invite
@@ -153,7 +157,7 @@ const Sync = () => {
                 <User className="w-4 h-4 text-primary-foreground" />
               </div>
               <div className="hidden lg:block">
-                <p className="text-sm font-medium text-foreground">User</p>
+                <p className="text-sm font-medium text-foreground">{user?.name || 'User'}</p>
                 <p className="text-xs text-muted-foreground">Free Plan</p>
               </div>
             </div>

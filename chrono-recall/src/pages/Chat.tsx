@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
 import { sendChatMessage, getUserStatus, connectGmail, connectDiscord } from "@/lib/api";
+import { useUser } from "@/contexts/UserContext";
 
 interface Message {
   id: number;
@@ -55,6 +56,8 @@ const MCP_SERVERS = [
 const Chat = () => {
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
+  const { user } = useUser();
+  const userId = user?.id || 'guest';
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState(initialQuery);
@@ -80,7 +83,7 @@ const Chat = () => {
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const status = await getUserStatus();
+        const status = await getUserStatus(userId);
         setConnectedServices(status.connectedServices || []);
       } catch (err) {
         console.error("Failed to get user status:", err);
@@ -135,7 +138,7 @@ const Chat = () => {
 
     try {
       // Call the actual backend API
-      const response = await sendChatMessage("justin", messageText, selectedPlatforms);
+      const response = await sendChatMessage(userId, messageText, selectedPlatforms);
 
       const aiMessage: Message = {
         id: Date.now() + 1,
@@ -196,9 +199,9 @@ const Chat = () => {
   const handleConnect = (platformId: string) => {
     setIsConnecting(true);
     if (platformId === 'gmail') {
-      connectGmail();
+      connectGmail(userId);
     } else if (platformId === 'discord') {
-      connectDiscord();
+      connectDiscord(userId);
     }
   };
 
@@ -277,7 +280,7 @@ const Chat = () => {
               <User className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">User</p>
+              <p className="text-sm font-medium truncate">{user?.name || 'User'}</p>
               <p className="text-xs text-muted-foreground">Free Plan</p>
             </div>
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
