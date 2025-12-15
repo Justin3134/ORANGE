@@ -335,7 +335,7 @@ export const handleChat = async (req: Request, res: Response) => {
     if (platforms.includes('discord')) {
       const discordConnected = isDiscordConnected(userId);
       console.log(`💬 Discord connected for ${userId}: ${discordConnected}`);
-      
+
       if (discordConnected) {
         // Build Discord search query from parsed terms
         const discordQuery = [
@@ -355,7 +355,7 @@ export const handleChat = async (req: Request, res: Response) => {
     if (platforms.includes('slack')) {
       const slackConnected = isSlackConnected(userId);
       console.log(`📨 Slack connected for ${userId}: ${slackConnected}`);
-      
+
       if (slackConnected) {
         // Build Slack search query from parsed terms
         const slackQuery = [

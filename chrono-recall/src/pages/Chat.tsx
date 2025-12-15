@@ -219,7 +219,7 @@ const Chat = () => {
     <div className="h-screen flex bg-background overflow-hidden">
       {/* Sidebar Overlay for mobile */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -228,9 +228,9 @@ const Chat = () => {
       {/* Sidebar */}
       <motion.aside
         initial={false}
-        animate={{ 
+        animate={{
           width: sidebarOpen ? 280 : 0,
-          opacity: sidebarOpen ? 1 : 0 
+          opacity: sidebarOpen ? 1 : 0
         }}
         transition={{ duration: 0.2, ease: "easeInOut" }}
         className={cn(

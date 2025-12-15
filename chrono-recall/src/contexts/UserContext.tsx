@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 
 interface User {
   id: string;
@@ -42,7 +42,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = (email: string, name?: string) => {
+  const login = useCallback((email: string, name?: string) => {
     const newUser: User = {
       id: generateUserId(email),
       email: email.toLowerCase(),
@@ -50,23 +50,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
     };
     setUser(newUser);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    user,
+    isLoading,
+    login,
+    logout,
+    isAuthenticated: !!user,
+  }), [user, isLoading, login, logout]);
 
   return (
-    <UserContext.Provider
-      value={{
-        user,
-        isLoading,
-        login,
-        logout,
-        isAuthenticated: !!user,
-      }}
-    >
+    <UserContext.Provider value={value}>
       {children}
     </UserContext.Provider>
   );

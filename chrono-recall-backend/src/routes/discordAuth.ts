@@ -206,12 +206,12 @@ export const handleDiscordCallback = async (req: Request, res: Response) => {
 
     // Create email-like identifier for Discord users
     const discordEmail = `${userInfo.username}@discord.user`;
-    
+
     // Use the original userId from state if it's a real user (not 'new_user')
     // This ensures Discord data is stored under the same ID as Gmail
     const isExistingUser = userId && userId !== 'new_user' && userId !== 'guest';
-    const finalUserId = isExistingUser 
-      ? userId as string 
+    const finalUserId = isExistingUser
+      ? userId as string
       : discordEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
     // Store Discord connection info for the user

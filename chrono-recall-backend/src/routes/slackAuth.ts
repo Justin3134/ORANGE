@@ -146,12 +146,12 @@ export const handleSlackCallback = async (req: Request, res: Response) => {
 
     // Create email-like identifier for the user
     const slackEmail = `${userInfo.user}@${userInfo.team}.slack`;
-    
+
     // Use the original userId from state if it's a real user (not 'new_user')
     // This ensures Slack data is stored under the same ID as Gmail/Discord
     const isExistingUser = userId && userId !== 'new_user' && userId !== 'guest';
-    const finalUserId = isExistingUser 
-      ? userId as string 
+    const finalUserId = isExistingUser
+      ? userId as string
       : slackEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
     // Store token

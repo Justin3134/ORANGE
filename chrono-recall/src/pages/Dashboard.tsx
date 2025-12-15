@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { User, ChevronRight, Sparkles, Filter, Search, Brain } from "lucide-react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,6 @@ import { toast } from "sonner";
 
 const Dashboard = () => {
   const { user, login } = useUser();
-  const [searchParams] = useSearchParams();
   const userId = user?.id || 'guest';
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,13 +44,14 @@ const Dashboard = () => {
     }
   };
 
-  // Handle OAuth callback - auto-login user
+  // Handle OAuth callback - auto-login user (runs once on mount)
   useEffect(() => {
-    const gmailConnectedParam = searchParams.get('gmail_connected');
-    const discordConnectedParam = searchParams.get('discord_connected');
-    const slackConnectedParam = searchParams.get('slack_connected');
-    const email = searchParams.get('email');
-    const name = searchParams.get('name');
+    const urlParams = new URLSearchParams(window.location.search);
+    const gmailConnectedParam = urlParams.get('gmail_connected');
+    const discordConnectedParam = urlParams.get('discord_connected');
+    const slackConnectedParam = urlParams.get('slack_connected');
+    const email = urlParams.get('email');
+    const name = urlParams.get('name');
 
     if ((gmailConnectedParam === 'true' || discordConnectedParam === 'true' || slackConnectedParam === 'true') && email) {
       // Auto-login the user from OAuth
@@ -76,7 +76,7 @@ const Dashboard = () => {
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [searchParams, login]);
+  }, [login]);
 
   // Check user status on mount
   useEffect(() => {
