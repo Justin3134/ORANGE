@@ -1,6 +1,6 @@
-# Chrono Recall Backend
+# RecallJump Backend
 
-Backend API for Chrono Recall - AI-powered memory search across platforms.
+Backend API for RecallJump - AI-powered memory search across platforms.
 
 ## Features
 

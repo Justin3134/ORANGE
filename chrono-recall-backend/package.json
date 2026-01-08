@@ -1,7 +1,7 @@
 {
-  "name": "chrono-recall-backend",
+  "name": "recalljump-backend",
   "version": "1.0.0",
-  "description": "Backend API for Chrono Recall - AI-powered memory search across platforms",
+  "description": "Backend API for RecallJump - AI-powered memory search across platforms",
   "main": "src/index.ts",
   "scripts": {
     "dev": "ts-node src/index.ts",

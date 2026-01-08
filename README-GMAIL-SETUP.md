@@ -1,4 +1,4 @@
-# Gmail OAuth Setup for Chrono Recall
+# Gmail OAuth Setup for RecallJump
 
 ## Step 1: Create Google Cloud Project
 
@@ -15,14 +15,14 @@
 2. Click "Create Credentials" > "OAuth 2.0 Client IDs"
 3. Configure OAuth consent screen (if prompted):
    - User Type: External
-   - App name: "Chrono Recall" (or your choice)
+   - App name: "RecallJump" (or your choice)
    - User support email: your email
    - Developer contact: your email
    - Save and Continue (skip other steps for now)
 4. Create OAuth Client ID:
    - Application type: "Web application"
-   - Name: "Chrono Recall Web"
-   - Authorized redirect URIs: `http://localhost:4000/auth/gmail/callback`
+   - Name: "RecallJump Web"
+   - Authorized redirect URIs: `http://localhost:4000/auth/gmail/callback` (for local dev) and `https://api.recalljump.com/auth/gmail/callback` (for production)
    - Click "Create"
 
 ## Step 3: Get Your Credentials

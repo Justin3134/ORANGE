@@ -166,7 +166,7 @@ app.use((req: Request, res: Response) => {
 
 // Start server
 app.listen(config.port, async () => {
-  console.log(`🚀 Chrono Recall Backend running on http://localhost:${config.port}`);
+  console.log(`🚀 RecallJump Backend running on http://localhost:${config.port}`);
   console.log(`📱 Frontend should connect from ${config.frontendUrl}`);
 
   // Check if Gmail OAuth is configured

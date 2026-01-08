@@ -504,7 +504,7 @@ const Dashboard = () => {
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
                   <Sparkles className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Welcome to Chrono Recall</h3>
+                <h3 className="text-lg font-semibold mb-2">Welcome to RecallJump</h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   Connect your accounts to start recalling memories from your emails, chats, and documents.
                 </p>
