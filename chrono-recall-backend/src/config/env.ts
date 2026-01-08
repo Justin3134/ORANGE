@@ -10,7 +10,7 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
 
   // Frontend URL for redirects
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:8082',
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:8080',
   backendUrl: process.env.BACKEND_URL || 'http://localhost:4000',
 
   // Google OAuth Configuration

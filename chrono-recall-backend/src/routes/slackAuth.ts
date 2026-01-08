@@ -1,9 +1,7 @@
-import { Router, Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { config } from '../config/env';
 import fs from 'fs';
 import path from 'path';
-
-const router = Router();
 
 // Token storage (in production, use a database)
 const TOKENS_FILE = path.join(process.cwd(), '.slack-tokens.json');
@@ -339,11 +337,5 @@ export const disconnectSlack = async (req: Request, res: Response) => {
   res.json({ success: true });
 };
 
-// Set up routes
-router.get('/slack', initiateSlackOAuth);
-router.get('/slack/callback', handleSlackCallback);
-router.get('/slack/status', getSlackStatus);
-router.post('/slack/disconnect', disconnectSlack);
-
-export default router;
+// Export sync handler with alias for consistency
 export { syncSlackMessages as syncSlackHandler };

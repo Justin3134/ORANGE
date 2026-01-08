@@ -25,12 +25,13 @@ import {
   Link2,
   PanelLeftClose,
   PanelLeft,
+  Tag,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
-import { sendChatMessage, getUserStatus, connectGmail, connectDiscord, connectSlack } from "@/lib/api";
+import { sendChatMessage, getUserStatus, connectGmail, connectDiscord, connectSlack, labelEmails } from "@/lib/api";
 import { useUser } from "@/contexts/UserContext";
 
 interface Message {
@@ -72,6 +73,10 @@ const Chat = () => {
   const [connectedServices, setConnectedServices] = useState<string[]>([]);
   const [showPlatformSelector, setShowPlatformSelector] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isLabeling, setIsLabeling] = useState(false);
+  const [lastSearchQuery, setLastSearchQuery] = useState("");
+  const [lastGmailIds, setLastGmailIds] = useState<string[]>([]);
+  const [lastTotalGmail, setLastTotalGmail] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -148,6 +153,14 @@ const Chat = () => {
       // Call the actual backend API
       const response = await sendChatMessage(userId, messageText, selectedPlatforms);
 
+      // Debug: Log response to see what we're getting
+      console.log('Chat response:', {
+        totalGmailCount: response.totalGmailCount,
+        allGmailIds: response.allGmailIds,
+        allGmailIdsLength: response.allGmailIds?.length,
+        hasGmail: selectedPlatforms.includes('gmail')
+      });
+
       const aiMessage: Message = {
         id: Date.now() + 1,
         role: "assistant",
@@ -157,6 +170,34 @@ const Chat = () => {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+
+      // Store search results for labeling (only if more than 5 Gmail results and Gmail is selected)
+      // Check both new fields and fallback to searchResults if needed
+      const gmailCount = response.totalGmailCount || response.searchResults?.gmail?.length || 0;
+      const gmailIds = response.allGmailIds || response.searchResults?.gmail?.map((m: any) => m.id) || [];
+      
+      if (selectedPlatforms.includes('gmail') && gmailCount > 5 && gmailIds.length > 5) {
+        console.log('✅ Setting label state:', {
+          totalGmailCount: gmailCount,
+          allGmailIdsLength: gmailIds.length,
+          searchQuery: messageText
+        });
+        setLastSearchQuery(messageText);
+        setLastGmailIds(gmailIds);
+        setLastTotalGmail(gmailCount);
+      } else {
+        console.log('❌ Clearing label state:', {
+          hasGmail: selectedPlatforms.includes('gmail'),
+          totalGmailCount: gmailCount,
+          allGmailIdsLength: gmailIds.length,
+          reason: !selectedPlatforms.includes('gmail') ? 'Gmail not selected' : 
+                  gmailCount <= 5 ? 'Count <= 5' : 
+                  gmailIds.length <= 5 ? 'IDs length <= 5' : 'Unknown'
+        });
+        // Clear if 5 or fewer results
+        setLastGmailIds([]);
+        setLastTotalGmail(0);
+      }
 
       // Add to conversation history
       if (messages.length === 0) {
@@ -184,6 +225,38 @@ const Chat = () => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  // Handle labeling emails
+  const handleLabelEmails = async () => {
+    if (lastGmailIds.length === 0) return;
+
+    setIsLabeling(true);
+    try {
+      // Generate label name from search query (max 30 chars)
+      const labelName = lastSearchQuery.length > 30 
+        ? lastSearchQuery.substring(0, 27) + "..."
+        : lastSearchQuery;
+      
+      const result = await labelEmails(userId, labelName, lastGmailIds);
+      
+      // Show success message
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        role: "assistant",
+        content: `✅ Successfully labeled ${result.results.success} email(s) with "${labelName}" in Gmail! You can now see all ${result.results.total} emails in your Gmail labels.`,
+        timestamp: new Date()
+      }]);
+    } catch (error: any) {
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        role: "assistant",
+        content: `❌ Failed to label emails: ${error.message}`,
+        timestamp: new Date()
+      }]);
+    } finally {
+      setIsLabeling(false);
     }
   };
 
@@ -490,6 +563,9 @@ const Chat = () => {
                                 >
                                   <Link2 className="w-3 h-3" />
                                   <span className="text-muted-foreground">{source.platform}</span>
+                                  {source.accountEmail && (
+                                    <span className="text-xs text-muted-foreground/70">({source.accountEmail})</span>
+                                  )}
                                   <span className="font-medium truncate max-w-[150px]">{source.title}</span>
                                 </a>
                               ))}
@@ -548,6 +624,41 @@ const Chat = () => {
         {/* Input Area */}
         <div className="border-t border-border/50 bg-background p-4">
           <div className="max-w-3xl mx-auto">
+            {/* Label Button - Show when there are more than 5 Gmail results */}
+            {lastTotalGmail > 5 && lastGmailIds.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-3 flex items-center justify-end"
+              >
+                <Button
+                  onClick={handleLabelEmails}
+                  disabled={isLabeling}
+                  className={cn(
+                    "gap-2 text-white",
+                    "bg-blue-500 hover:bg-blue-600",
+                    "animate-pulse hover:animate-none",
+                    "transition-all duration-200",
+                    "shadow-lg hover:shadow-xl",
+                    "border-0"
+                  )}
+                  size="sm"
+                >
+                  {isLabeling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Labeling...
+                    </>
+                  ) : (
+                    <>
+                      <Tag className="w-4 h-4" />
+                      Label {lastTotalGmail - 5}+ emails
+                    </>
+                  )}
+                </Button>
+              </motion.div>
+            )}
+
             {/* Platform selector pills */}
             {connectedServices.length > 0 && messages.length > 0 && (
               <div className="flex items-center gap-2 mb-3">

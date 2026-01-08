@@ -14,7 +14,10 @@ import {
   getGmailStatus,
   syncGmailMessages,
   disconnectGmail,
-  isGmailConnected
+  isGmailConnected,
+  labelEmails,
+  getGmailAccountCount,
+  getGmailAccounts
 } from './routes/gmailAuth';
 import {
   initiateDiscordAuth,
@@ -78,6 +81,9 @@ app.get('/integrations', getIntegrations);
 // Gmail sync route
 app.post('/api/sync-gmail', syncGmailMessages);
 
+// Label emails route
+app.post('/api/label-emails', labelEmails);
+
 // Discord sync route
 app.post('/api/sync-discord', syncDiscordMessages);
 
@@ -115,6 +121,8 @@ app.get('/api/user/status', (req: Request, res: Response) => {
   res.json({
     userId,
     connectedServices,
+    gmailAccountCount: getGmailAccountCount(userId),
+    gmailAccounts: getGmailAccounts(userId),
     memoriesCount: 0, // Can be extended later
     isAuthenticated: connectedServices.length > 0
   });

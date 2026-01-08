@@ -28,7 +28,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { getUserStatus, disconnectService, connectGmail, connectDiscord, getDiscordStatus, disconnectDiscord } from "@/lib/api";
+import { getUserStatus, disconnectService, connectGmail, connectDiscord, getDiscordStatus, disconnectDiscord, getGmailStatus, disconnectGmailAccount } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/contexts/UserContext";
 
@@ -41,6 +41,7 @@ const Settings = () => {
   const [autoSync, setAutoSync] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [connectedServices, setConnectedServices] = useState<string[]>([]);
+  const [gmailAccounts, setGmailAccounts] = useState<Array<{ email: string; name: string; connectedAt: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [memoriesCount, setMemoriesCount] = useState(0);
@@ -71,6 +72,17 @@ const Settings = () => {
         const status = await getUserStatus(userId);
         setConnectedServices(status.connectedServices || []);
         setMemoriesCount(status.memoriesCount || 0);
+        setGmailAccounts(status.gmailAccounts || []);
+
+        // Load Gmail-specific status if connected
+        if (status.connectedServices?.includes('gmail')) {
+          try {
+            const gmailStatus = await getGmailStatus(userId);
+            setGmailAccounts(gmailStatus.accounts || []);
+          } catch (err) {
+            console.error("Failed to load Gmail status:", err);
+          }
+        }
 
         // Load Discord-specific status if connected
         if (status.connectedServices?.includes('discord')) {
@@ -151,6 +163,24 @@ const Settings = () => {
       setMemoriesCount(0);
     } catch (err) {
       console.error("Failed to disconnect:", err);
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  // Handle disconnect specific Gmail account
+  const handleDisconnectGmailAccount = async (emailId: string) => {
+    setIsDisconnecting(true);
+    try {
+      await disconnectGmailAccount(userId, emailId);
+      // Reload Gmail status
+      const gmailStatus = await getGmailStatus(userId);
+      setGmailAccounts(gmailStatus.accounts || []);
+      if (gmailStatus.accounts.length === 0) {
+        setConnectedServices(prev => prev.filter(s => s !== 'gmail'));
+      }
+    } catch (err) {
+      console.error("Failed to disconnect Gmail account:", err);
     } finally {
       setIsDisconnecting(false);
     }
@@ -257,36 +287,84 @@ const Settings = () => {
             darkMode ? "bg-white/5 border-white/10 divide-white/10" : "glass-card divide-border/50"
           )}>
             {/* Gmail */}
-            <div className="flex items-center gap-4 p-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-500/10 text-red-500">
-                <Mail className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <p className={cn("font-medium", darkMode ? "text-white" : "text-foreground")}>Gmail</p>
-                <p className={cn("text-sm", darkMode ? "text-white/60" : "text-muted-foreground")}>
-                  {connectedServices.includes('gmail')
-                    ? 'Connected and syncing emails'
-                    : 'Not connected'}
-                </p>
-              </div>
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-              ) : connectedServices.includes('gmail') ? (
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDisconnect('gmail')}
-                    disabled={isDisconnecting}
-                  >
-                    {isDisconnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Disconnect'}
-                  </Button>
+            <div className="p-4">
+              <div className="flex items-center gap-4 mb-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-500/10 text-red-500">
+                  <Mail className="w-5 h-5" />
                 </div>
-              ) : (
-                <Button size="sm" onClick={() => connectGmail(userId)}>
-                  Connect
-                </Button>
+                <div className="flex-1">
+                  <p className={cn("font-medium", darkMode ? "text-white" : "text-foreground")}>Gmail</p>
+                  <p className={cn("text-sm", darkMode ? "text-white/60" : "text-muted-foreground")}>
+                    {connectedServices.includes('gmail')
+                      ? `${gmailAccounts.length} account${gmailAccounts.length !== 1 ? 's' : ''} connected`
+                      : 'Not connected'}
+                  </p>
+                </div>
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                ) : connectedServices.includes('gmail') ? (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => connectGmail(userId)}
+                      className="gap-2"
+                    >
+                      <Mail className="w-4 h-4" />
+                      Add Another Account
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" onClick={() => connectGmail(userId)}>
+                    Connect
+                  </Button>
+                )}
+              </div>
+              
+              {/* List of connected Gmail accounts */}
+              {gmailAccounts.length > 0 && (
+                <div className="ml-14 space-y-2 mt-3">
+                  {gmailAccounts.map((account, index) => {
+                    const emailId = account.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                    return (
+                      <div
+                        key={emailId}
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-lg border",
+                          darkMode ? "bg-white/5 border-white/10" : "bg-secondary/50 border-border/50"
+                        )}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className={cn("text-sm font-medium truncate", darkMode ? "text-white" : "text-foreground")}>
+                            {account.name || account.email}
+                          </p>
+                          <p className={cn("text-xs truncate", darkMode ? "text-white/60" : "text-muted-foreground")}>
+                            {account.email}
+                          </p>
+                          <p className={cn("text-xs mt-1", darkMode ? "text-white/40" : "text-muted-foreground")}>
+                            Connected {new Date(account.connectedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        {gmailAccounts.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDisconnectGmailAccount(emailId)}
+                            disabled={isDisconnecting}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                          >
+                            {isDisconnecting ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
 

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import OpenAI from 'openai';
 import { config } from '../config/env';
-import { getAuthenticatedClient } from './gmailAuth';
+import { getAllAuthenticatedClients } from './gmailAuth';
 import { searchDiscordMessages, isDiscordConnected } from './discordAuth';
 import { searchSlackMessages, isSlackConnected } from './slackAuth';
 import { google } from 'googleapis';
@@ -205,18 +205,16 @@ function buildGmailQuery(parsed: {
 }
 
 /**
- * Search Gmail with a specific query
+ * Search a single Gmail account
  */
-async function searchGmail(userId: string, query: string): Promise<any[]> {
-  const oauth2Client = getAuthenticatedClient(userId);
-  if (!oauth2Client) {
-    return [];
-  }
-
+async function searchSingleGmailAccount(
+  gmail: any,
+  accountEmail: string,
+  query: string,
+  maxResults: number = 20
+): Promise<any[]> {
   try {
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-
-    console.log(`🔍 Gmail search query: "${query || '(recent emails)'}"`);
+    console.log(`🔍 Searching Gmail account ${accountEmail} with query: "${query || '(recent emails)'}"`);
 
     // Search Gmail with the query (or get recent if no query)
     const response = await gmail.users.messages.list({
@@ -229,7 +227,7 @@ async function searchGmail(userId: string, query: string): Promise<any[]> {
     const fetchedMessages = [];
 
     // Fetch full message details
-    for (const msg of messages.slice(0, 20)) {
+    for (const msg of messages.slice(0, maxResults)) {
       try {
         const fullMessage = await gmail.users.messages.get({
           userId: 'me',
@@ -239,7 +237,7 @@ async function searchGmail(userId: string, query: string): Promise<any[]> {
 
         const headers = fullMessage.data.payload?.headers || [];
         const getHeader = (name: string) =>
-          headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
+          headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
 
         // Get message body with proper decoding
         let body = '';
@@ -267,17 +265,58 @@ async function searchGmail(userId: string, query: string): Promise<any[]> {
           date: getHeader('Date'),
           snippet: fullMessage.data.snippet,
           body: body.substring(0, 1500),
-          url: `https://mail.google.com/mail/u/0/#inbox/${msg.id}`
+          url: `https://mail.google.com/mail/u/0/#inbox/${msg.id}`,
+          accountEmail // Add account identifier
         });
       } catch (err) {
-        console.error(`Error fetching message ${msg.id}:`, err);
+        console.error(`Error fetching message ${msg.id} from ${accountEmail}:`, err);
       }
     }
 
-    console.log(`📧 Found ${fetchedMessages.length} matching emails`);
+    console.log(`📧 Found ${fetchedMessages.length} matching emails in ${accountEmail}`);
     return fetchedMessages;
   } catch (err) {
-    console.error('Error searching Gmail:', err);
+    console.error(`Error searching Gmail account ${accountEmail}:`, err);
+    return [];
+  }
+}
+
+/**
+ * Search Gmail across all connected accounts for a user
+ */
+async function searchGmail(userId: string, query: string): Promise<any[]> {
+  const accountClients = getAllAuthenticatedClients(userId);
+  
+  if (accountClients.length === 0) {
+    console.log(`⚠️ No Gmail accounts connected for user ${userId}`);
+    return [];
+  }
+
+  console.log(`🔍 Searching ${accountClients.length} Gmail account(s) for user ${userId}`);
+
+  // Search all accounts in parallel
+  const searchPromises = accountClients.map(({ email, client }) => {
+    const gmail = google.gmail({ version: 'v1', auth: client });
+    return searchSingleGmailAccount(gmail, email, query, 20);
+  });
+
+  try {
+    const allResults = await Promise.all(searchPromises);
+    
+    // Combine all results from all accounts
+    const combinedResults = allResults.flat();
+    
+    // Sort by date (newest first)
+    combinedResults.sort((a, b) => {
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+      return dateB - dateA;
+    });
+
+    console.log(`📧 Found ${combinedResults.length} total matching emails across ${accountClients.length} account(s)`);
+    return combinedResults;
+  } catch (err) {
+    console.error('Error searching Gmail accounts:', err);
     return [];
   }
 }
@@ -430,7 +469,8 @@ ${allContext
       title: m.subject || 'Email',
       from: m.from,
       date: m.date,
-      url: m.url
+      url: m.url,
+      accountEmail: m.accountEmail // Include account identifier
     }));
 
     const discordSources = discordMessages.slice(0, 5).map(m => ({
@@ -462,10 +502,13 @@ ${allContext
       sources: allSources,
       connectedServices: servicesWithResults,
       searchResults: {
-        gmail: gmailMessages.slice(0, 5),
+        gmail: gmailMessages.slice(0, 5), // Always show 1-5 emails
         discord: discordMessages.slice(0, 5),
         slack: slackMessages.slice(0, 5)
       },
+      // Add fields for labeling feature
+      totalGmailCount: gmailMessages.length,
+      allGmailIds: gmailMessages.map(m => m.id), // All email IDs for labeling
       hasRelevantSources: allSources.length > 0
     });
 

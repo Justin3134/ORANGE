@@ -197,7 +197,36 @@ export async function getUserStatus(userId: string = DEFAULT_USER_ID) {
     throw new Error("Failed to get user status");
   }
 
-  return res.json(); // { userId, connectedServices, memoriesCount, isAuthenticated }
+  return res.json(); // { userId, connectedServices, gmailAccountCount, gmailAccounts, memoriesCount, isAuthenticated }
+}
+
+// Get Gmail status (all connected accounts)
+export async function getGmailStatus(userId: string = DEFAULT_USER_ID) {
+  const res = await fetch(`${BACKEND_URL}/auth/gmail/status?userId=${userId}`);
+
+  if (!res.ok) {
+    throw new Error("Failed to get Gmail status");
+  }
+
+  return res.json(); // { connected, accountCount, accounts: [{ email, name, connectedAt }] }
+}
+
+// Disconnect specific Gmail account
+export async function disconnectGmailAccount(userId: string = DEFAULT_USER_ID, emailId?: string) {
+  const res = await fetch(`${BACKEND_URL}/auth/gmail/disconnect`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ userId, emailId }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.error || "Failed to disconnect Gmail account");
+  }
+
+  return res.json();
 }
 
 // Get recent memories
@@ -223,6 +252,28 @@ export async function disconnectService(userId: string = DEFAULT_USER_ID, servic
 
   if (!res.ok) {
     throw new Error(`Failed to disconnect ${service}`);
+  }
+
+  return res.json();
+}
+
+// Label emails in Gmail
+export async function labelEmails(
+  userId: string = DEFAULT_USER_ID,
+  labelName: string,
+  emailIds: string[]
+) {
+  const res = await fetch(`${BACKEND_URL}/api/label-emails`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ userId, labelName, emailIds }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.error || "Failed to label emails");
   }
 
   return res.json();
