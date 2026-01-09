@@ -279,7 +279,13 @@ const Dashboard = () => {
                 transition={{ delay: 0.3 }}
                 className="mt-8"
               >
-                <h3 className="text-lg font-semibold mb-4">Connect Your Accounts</h3>
+                <div className="text-center py-12">
+                  <img src={logo} alt="RecallJump" className="w-16 h-16 mx-auto mb-4 object-contain" />
+                  <h3 className="text-lg font-semibold mb-4">Connect Your Accounts</h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Connect your accounts to start recalling memories from your emails, chats, and documents.
+                  </p>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {SYNC_INTEGRATIONS.map((integration, i) => (
                     <motion.div
@@ -451,9 +457,7 @@ const Dashboard = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center py-12"
               >
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Sparkles className="w-8 h-8 text-primary" />
-                </div>
+                <img src={logo} alt="RecallJump" className="w-16 h-16 mx-auto mb-4 object-contain" />
                 <h3 className="text-lg font-semibold mb-2">Welcome to RecallJump</h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   Connect your accounts to start recalling memories from your emails, chats, and documents.

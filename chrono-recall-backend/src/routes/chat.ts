@@ -266,8 +266,9 @@ async function searchSingleGmailAccount(
           date: getHeader('Date'),
           snippet: fullMessage.data.snippet,
           body: body.substring(0, 1500),
-          // Use account index in URL to redirect to the correct Gmail account
-          url: `https://mail.google.com/mail/u/${accountIndex}/#inbox/${msg.id}`,
+          // Use Gmail search URL with message ID - works across all accounts
+          // Gmail will automatically route to the correct account where the message exists
+          url: `https://mail.google.com/mail/u/0/#search/rfc822msgid:${msg.id}`,
           accountEmail, // Add account identifier
           accountIndex // Store account index for reference
         });
@@ -453,18 +454,84 @@ ${allContext
         ? `Here are the messages matching the user's search:\n\n${allContext}`
         : 'No matching messages were found for this search.'}`;
 
-    // Step 6: Get AI response
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000
-    });
+    // Step 6: Get AI response with better error handling
+    let aiResponse: string;
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        temperature: 0.7,
+        max_tokens: 1500 // Increased for better responses
+      });
 
-    const aiResponse = completion.choices[0]?.message?.content || "I couldn't generate a response.";
+      aiResponse = completion.choices[0]?.message?.content || '';
+      
+      // If OpenAI returns empty response but we have context, provide a helpful summary
+      if (!aiResponse || aiResponse.trim().length === 0) {
+        console.warn('⚠️ OpenAI returned empty response, generating fallback');
+        if (allContext) {
+          const totalResults = gmailMessages.length + discordMessages.length + slackMessages.length;
+          aiResponse = `I found ${totalResults} result(s) matching your query:\n\n`;
+          
+          if (gmailMessages.length > 0) {
+            aiResponse += `**Emails (${gmailMessages.length}):**\n`;
+            gmailMessages.slice(0, 10).forEach((m, i) => {
+              aiResponse += `${i + 1}. ${m.subject || 'Email'} from ${m.from} on ${m.date}\n`;
+            });
+          }
+          
+          if (discordMessages.length > 0) {
+            aiResponse += `\n**Discord Messages (${discordMessages.length}):**\n`;
+            discordMessages.slice(0, 10).forEach((m, i) => {
+              aiResponse += `${i + 1}. #${m.channelName} in ${m.guildName} from ${m.authorUsername}\n`;
+            });
+          }
+          
+          if (slackMessages.length > 0) {
+            aiResponse += `\n**Slack Messages (${slackMessages.length}):**\n`;
+            slackMessages.slice(0, 10).forEach((m, i) => {
+              aiResponse += `${i + 1}. #${m.channelName}\n`;
+            });
+          }
+        } else {
+          aiResponse = "I couldn't find any messages matching your query. Try rephrasing your search or check if your accounts are properly connected.";
+        }
+      }
+    } catch (openaiError: any) {
+      console.error('❌ OpenAI API error:', openaiError);
+      
+      // Provide helpful fallback response based on found messages
+      if (allContext) {
+        const totalResults = gmailMessages.length + discordMessages.length + slackMessages.length;
+        aiResponse = `I found ${totalResults} result(s) matching your query, but encountered an issue generating a detailed response:\n\n`;
+        
+        if (gmailMessages.length > 0) {
+          aiResponse += `**Emails (${gmailMessages.length}):**\n`;
+          gmailMessages.slice(0, 10).forEach((m, i) => {
+            aiResponse += `${i + 1}. ${m.subject || 'Email'} from ${m.from} on ${m.date}\n`;
+          });
+        }
+        
+        if (discordMessages.length > 0) {
+          aiResponse += `\n**Discord Messages (${discordMessages.length}):**\n`;
+          discordMessages.slice(0, 10).forEach((m, i) => {
+            aiResponse += `${i + 1}. #${m.channelName} in ${m.guildName} from ${m.authorUsername}\n`;
+          });
+        }
+        
+        if (slackMessages.length > 0) {
+          aiResponse += `\n**Slack Messages (${slackMessages.length}):**\n`;
+          slackMessages.slice(0, 10).forEach((m, i) => {
+            aiResponse += `${i + 1}. #${m.channelName}\n`;
+          });
+        }
+      } else {
+        aiResponse = `I encountered an error processing your request: ${openaiError.message || 'Please try again.'}`;
+      }
+    }
 
     // Build sources from both Gmail and Discord
     const gmailSources = gmailMessages.slice(0, 5).map(m => ({
@@ -511,8 +578,8 @@ ${allContext
       },
       // Add fields for labeling feature
       totalGmailCount: gmailMessages.length,
-      allGmailIds: gmailMessages.map(m => m.id), // All email IDs for labeling
-      allGmailEmails: gmailMessages.map(m => ({ id: m.id, accountEmail: m.accountEmail, accountIndex: m.accountIndex })), // All emails with account info for labeling
+      allGmailIds: gmailMessages.map(m => m.id), // All email IDs for labeling (legacy support)
+      allGmailEmails: gmailMessages.map(m => ({ id: m.id, accountEmail: m.accountEmail })), // All emails with account info for labeling
       hasRelevantSources: allSources.length > 0
     });
 

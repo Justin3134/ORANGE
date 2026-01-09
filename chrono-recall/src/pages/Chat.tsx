@@ -40,12 +40,14 @@ interface Message {
   content: string;
   timestamp: Date;
   sources?: { platform: string; title: string; url?: string; accountEmail?: string }[];
+  conversationId?: string; // Link message to conversation
 }
 
 interface Conversation {
   id: string;
   title: string;
   timestamp: Date;
+  messageIds?: number[]; // Store message IDs for this conversation
 }
 
 interface ChatResponse {
@@ -83,6 +85,7 @@ const Chat = () => {
   const [input, setInput] = useState(initialQuery);
   const [isTyping, setIsTyping] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['gmail']);
   const [connectedServices, setConnectedServices] = useState<string[]>([]);
@@ -111,8 +114,19 @@ const Chat = () => {
       const stored = localStorage.getItem('chat_history');
       if (stored) {
         const parsed = JSON.parse(stored);
-        setMessages(parsed.messages || []);
-        setConversations(parsed.conversations || []);
+        // Restore conversations
+        if (parsed.conversations && Array.isArray(parsed.conversations)) {
+          setConversations(parsed.conversations);
+        }
+        // Restore all messages (we'll filter by conversation when needed)
+        if (parsed.messages && Array.isArray(parsed.messages)) {
+          // Convert timestamp strings back to Date objects
+          const restoredMessages = parsed.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+          }));
+          setMessages(restoredMessages);
+        }
       }
     } catch (e) {
       console.error('Failed to load chat history:', e);
@@ -196,11 +210,18 @@ const Chat = () => {
       return;
     }
 
+    // Create or get conversation ID
+    const conversationId = currentConversationId || Date.now().toString();
+    if (!currentConversationId) {
+      setCurrentConversationId(conversationId);
+    }
+
     const userMessage: Message = {
       id: Date.now(),
       role: "user",
       content: messageText,
       timestamp: new Date(),
+      conversationId: conversationId
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -224,10 +245,29 @@ const Chat = () => {
         role: "assistant",
         content: response.response,
         timestamp: new Date(),
-        sources: response.sources || []
+        sources: response.sources || [],
+        conversationId: conversationId
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+
+      // Create or update conversation
+      if (!currentConversationId) {
+        const newConversation: Conversation = {
+          id: conversationId,
+          title: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : ''),
+          timestamp: new Date(),
+          messageIds: [userMessage.id, aiMessage.id]
+        };
+        setConversations(prev => [newConversation, ...prev]);
+      } else {
+        // Update existing conversation
+        setConversations(prev => prev.map(conv => 
+          conv.id === conversationId 
+            ? { ...conv, messageIds: [...(conv.messageIds || []), userMessage.id, aiMessage.id] }
+            : conv
+        ));
+      }
 
       // Store search results for labeling (only if more than 5 Gmail results and Gmail is selected)
       // Check both new fields and fallback to searchResults if needed
@@ -262,15 +302,6 @@ const Chat = () => {
         setLastGmailIds([]);
         setLastGmailEmails([]);
         setLastTotalGmail(0);
-      }
-
-      // Add to conversation history
-      if (messages.length === 0) {
-        setConversations(prev => [{
-          id: Date.now().toString(),
-          title: messageText.substring(0, 30) + (messageText.length > 30 ? '...' : ''),
-          timestamp: new Date()
-        }, ...prev]);
       }
     } catch (error: any) {
       console.error("Chat error:", error);
@@ -341,6 +372,34 @@ const Chat = () => {
   const startNewChat = () => {
     setMessages([]);
     setInput("");
+    setCurrentConversationId(null);
+  };
+
+  const loadConversation = (conversationId: string) => {
+    // Load messages for this conversation from localStorage
+    try {
+      const stored = localStorage.getItem('chat_history');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const allMessages = parsed.messages || [];
+        // Filter messages by conversationId
+        const conversationMessages = allMessages
+          .filter((msg: any) => msg.conversationId === conversationId)
+          .map((msg: any) => ({
+            ...msg,
+            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+          }));
+        
+        if (conversationMessages.length > 0) {
+          setMessages(conversationMessages);
+          setCurrentConversationId(conversationId);
+        } else {
+          console.warn('No messages found for conversation:', conversationId);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load conversation:', e);
+    }
   };
 
   const togglePlatform = (platformId: string) => {
@@ -409,7 +468,11 @@ const Chat = () => {
               conversations.map((conv) => (
                 <button
                   key={conv.id}
-                  className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-secondary/50 transition-colors group"
+                  onClick={() => loadConversation(conv.id)}
+                  className={cn(
+                    "w-full text-left px-3 py-2.5 rounded-lg hover:bg-secondary/50 transition-colors group",
+                    currentConversationId === conv.id && "bg-secondary/30"
+                  )}
                 >
                   <div className="flex items-center gap-3">
                     <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -731,7 +794,7 @@ const Chat = () => {
             )}
             
             {/* Label Button - Show when there are more than 5 Gmail results */}
-            {lastTotalGmail > 5 && (lastGmailEmails.length > 5 || lastGmailIds.length > 5) && (
+            {lastTotalGmail > 5 && lastGmailEmails.length > 0 && (
               <div className="mb-3 flex items-center justify-end">
                 <Button
                   onClick={handleLabelEmails}
