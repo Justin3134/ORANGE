@@ -706,14 +706,29 @@ const Chat = () => {
                                     const threadId = threadIdMatch ? threadIdMatch[1] : null;
                                     
                                     if (threadId) {
-                                      // Use #inbox/ format - Gmail recognizes this as direct thread link
-                                      // This should open the thread directly, not search
-                                      const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
+                                      // Get browser-specific index from localStorage
+                                      let gmailIndex = 0; // Default fallback
+                                      
+                                      if (source.accountEmail) {
+                                        const emailId = source.accountEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                                        const storageKey = `gmail_account_index_${emailId}`;
+                                        const localIndex = localStorage.getItem(storageKey);
+                                        
+                                        if (localIndex !== null) {
+                                          const parsedIndex = parseInt(localIndex, 10);
+                                          if (!isNaN(parsedIndex) && parsedIndex >= 0 && parsedIndex <= 10) {
+                                            gmailIndex = parsedIndex;
+                                          }
+                                        }
+                                      }
+                                      
+                                      // Use browser-specific index from localStorage
+                                      const gmailUrl = `https://mail.google.com/mail/u/${gmailIndex}/#inbox/${threadId}`;
                                       
                                       // Open the URL directly - this should open the thread, not search
                                       window.open(gmailUrl, '_blank', 'noopener,noreferrer');
                                       
-                                      console.log(`Opening Gmail thread: ${threadId} for account: ${source.accountEmail || 'default'}`);
+                                      console.log(`Opening Gmail thread: ${threadId} for account: ${source.accountEmail || 'default'} at u/${gmailIndex}`);
                                     } else {
                                       // Fallback: use the URL as-is
                                       window.open(source.url, '_blank', 'noopener,noreferrer');
@@ -727,8 +742,24 @@ const Chat = () => {
                                     // Extract thread ID from URL (format: #inbox/<threadId>)
                                     const threadIdMatch = source.url.match(/#inbox\/([^/?]+)/);
                                     if (threadIdMatch) {
-                                      // Use #inbox/ format - Gmail recognizes this as direct thread link
-                                      return `https://mail.google.com/mail/u/0/#inbox/${threadIdMatch[1]}`;
+                                      // Get browser-specific index from localStorage
+                                      let gmailIndex = 0; // Default fallback
+                                      
+                                      if (source.accountEmail) {
+                                        const emailId = source.accountEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                                        const storageKey = `gmail_account_index_${emailId}`;
+                                        const localIndex = localStorage.getItem(storageKey);
+                                        
+                                        if (localIndex !== null) {
+                                          const parsedIndex = parseInt(localIndex, 10);
+                                          if (!isNaN(parsedIndex) && parsedIndex >= 0 && parsedIndex <= 10) {
+                                            gmailIndex = parsedIndex;
+                                          }
+                                        }
+                                      }
+                                      
+                                      // Use browser-specific index from localStorage
+                                      return `https://mail.google.com/mail/u/${gmailIndex}/#inbox/${threadIdMatch[1]}`;
                                     }
                                   }
                                   return source.url || '#';

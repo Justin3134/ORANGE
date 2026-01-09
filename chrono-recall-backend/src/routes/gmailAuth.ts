@@ -549,26 +549,37 @@ export function getGmailAccounts(userId: string): Array<{ email: string; name: s
  * PUT /api/gmail/account-index
  */
 export const updateGmailAccountIndex = (req: Request, res: Response) => {
+  console.log('📝 PUT /api/gmail/account-index - Request received:', {
+    body: req.body,
+    userId: req.body?.userId,
+    emailId: req.body?.emailId,
+    gmailAccountIndex: req.body?.gmailAccountIndex
+  });
+
   const { userId, emailId, gmailAccountIndex } = req.body;
 
   if (!userId || !emailId || gmailAccountIndex === undefined) {
+    console.log('❌ Missing required fields:', { userId: !!userId, emailId: !!emailId, gmailAccountIndex: gmailAccountIndex !== undefined });
     return res.status(400).json({ error: 'userId, emailId, and gmailAccountIndex are required' });
   }
 
   try {
     const userAccounts = tokenStore.get(userId);
     if (!userAccounts) {
+      console.log(`❌ User not found: ${userId}`);
       return res.status(404).json({ error: 'User not found' });
     }
 
     const account = userAccounts.get(emailId);
     if (!account) {
+      console.log(`❌ Gmail account not found: ${emailId} for user ${userId}`);
       return res.status(404).json({ error: 'Gmail account not found' });
     }
 
     // Validate index is a number between 0 and 10
     const index = parseInt(String(gmailAccountIndex), 10);
     if (isNaN(index) || index < 0 || index > 10) {
+      console.log(`❌ Invalid index value: ${gmailAccountIndex}`);
       return res.status(400).json({ error: 'gmailAccountIndex must be a number between 0 and 10' });
     }
 
@@ -585,8 +596,8 @@ export const updateGmailAccountIndex = (req: Request, res: Response) => {
       gmailAccountIndex: account.gmailAccountIndex
     });
   } catch (err: any) {
-    console.error('Error updating Gmail account index:', err);
-    res.status(500).json({ error: 'Failed to update account index' });
+    console.error('❌ Error updating Gmail account index:', err);
+    res.status(500).json({ error: 'Failed to update account index', details: err.message });
   }
 };
 

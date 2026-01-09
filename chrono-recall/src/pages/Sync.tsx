@@ -74,8 +74,24 @@ const Sync = () => {
         if (status.connectedServices?.includes('gmail')) {
           try {
             const gmailStatus = await getGmailStatus(userId);
-            setGmailAccounts(gmailStatus.accounts || []);
-            console.log(`✅ Sync: Loaded ${gmailStatus.accounts?.length || 0} Gmail account(s)`);
+            const accounts = gmailStatus.accounts || [];
+            
+            // Load browser-specific index mappings from localStorage
+            const accountsWithLocalIndex = accounts.map(account => {
+              const emailId = account.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+              const storageKey = `gmail_account_index_${emailId}`;
+              const localIndex = localStorage.getItem(storageKey);
+              
+              // Use localStorage value if available, otherwise fall back to backend value, otherwise undefined
+              const gmailAccountIndex = localIndex !== null 
+                ? parseInt(localIndex, 10) 
+                : (account.gmailAccountIndex !== undefined ? account.gmailAccountIndex : undefined);
+              
+              return { ...account, gmailAccountIndex };
+            });
+            
+            setGmailAccounts(accountsWithLocalIndex);
+            console.log(`✅ Sync: Loaded ${accountsWithLocalIndex.length} Gmail account(s) with browser-specific indices`);
           } catch (err) {
             console.error("Failed to load Gmail status:", err);
           }
@@ -112,8 +128,24 @@ const Sync = () => {
             if (status.connectedServices?.includes('gmail')) {
               try {
                 const gmailStatus = await getGmailStatus(currentUserId);
-                setGmailAccounts(gmailStatus.accounts || []);
-                console.log(`✅ Sync: Loaded ${gmailStatus.accounts?.length || 0} Gmail account(s)`);
+                const accounts = gmailStatus.accounts || [];
+                
+                // Load browser-specific index mappings from localStorage
+                const accountsWithLocalIndex = accounts.map(account => {
+                  const emailId = account.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                  const storageKey = `gmail_account_index_${emailId}`;
+                  const localIndex = localStorage.getItem(storageKey);
+                  
+                  // Use localStorage value if available, otherwise fall back to backend value, otherwise undefined
+                  const gmailAccountIndex = localIndex !== null 
+                    ? parseInt(localIndex, 10) 
+                    : (account.gmailAccountIndex !== undefined ? account.gmailAccountIndex : undefined);
+                  
+                  return { ...account, gmailAccountIndex };
+                });
+                
+                setGmailAccounts(accountsWithLocalIndex);
+                console.log(`✅ Sync: Loaded ${accountsWithLocalIndex.length} Gmail account(s) with browser-specific indices`);
               } catch (err) {
                 console.error("Failed to load Gmail status:", err);
               }
@@ -230,14 +262,41 @@ const Sync = () => {
       e.stopPropagation();
     }
     try {
-      await updateGmailAccountIndex(userId, emailId, indexValue);
-      // Reload Gmail accounts
-      const gmailStatus = await getGmailStatus(userId);
-      setGmailAccounts(gmailStatus.accounts || []);
+      // Validate index value
+      const index = parseInt(String(indexValue), 10);
+      if (isNaN(index) || index < 0 || index > 10) {
+        alert('Index must be a number between 0 and 10');
+        return;
+      }
+
+      // Save to localStorage first (browser-specific mapping)
+      const storageKey = `gmail_account_index_${emailId}`;
+      localStorage.setItem(storageKey, String(index));
+      console.log(`💾 Saved Gmail account index to localStorage: ${email} -> u/${index}`);
+
+      // Also save to backend (as fallback/default)
+      try {
+        await updateGmailAccountIndex(userId, emailId, index);
+        console.log(`✅ Saved Gmail account index to backend: ${email} -> u/${index}`);
+      } catch (backendErr: any) {
+        console.warn("⚠️ Failed to save index to backend (using localStorage only):", backendErr);
+        // Continue anyway - localStorage is the primary source
+      }
+
+      // Update local state immediately (don't wait for reload)
+      setGmailAccounts(prevAccounts => 
+        prevAccounts.map(acc => {
+          if (acc.email.toLowerCase().replace(/[^a-z0-9]/g, '_') === emailId) {
+            return { ...acc, gmailAccountIndex: index };
+          }
+          return acc;
+        })
+      );
+      
       setEditingIndex(null);
+      console.log(`✅ Index updated: ${email} -> u/${index}`);
     } catch (err: any) {
       console.error("Failed to update index:", err);
-      // Show error but don't navigate - keep editing state so user can retry
       alert(err.message || "Failed to update Gmail account index");
     }
   };
@@ -547,7 +606,7 @@ const Sync = () => {
                                     ) : (
                                       <div className="flex items-center gap-1">
                                         <span className="px-1.5 py-0.5 rounded text-xs font-mono bg-background text-foreground border border-border">
-                                          u/{account.gmailAccountIndex ?? '?'}
+                                          u/{account.gmailAccountIndex !== undefined ? account.gmailAccountIndex : '?'}
                                         </span>
                                         <button
                                           type="button"
@@ -583,8 +642,24 @@ const Sync = () => {
                                         try {
                                           await disconnectGmailAccount(userId, emailId);
                                           const gmailStatus = await getGmailStatus(userId);
-                                          setGmailAccounts(gmailStatus.accounts || []);
-                                          if (gmailStatus.accounts.length === 0) {
+                                          const accounts = gmailStatus.accounts || [];
+                                          
+                                          // Load browser-specific index mappings from localStorage
+                                          const accountsWithLocalIndex = accounts.map(account => {
+                                            const emailId = account.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                                            const storageKey = `gmail_account_index_${emailId}`;
+                                            const localIndex = localStorage.getItem(storageKey);
+                                            
+                                            // Use localStorage value if available, otherwise fall back to backend value, otherwise undefined
+                                            const gmailAccountIndex = localIndex !== null 
+                                              ? parseInt(localIndex, 10) 
+                                              : (account.gmailAccountIndex !== undefined ? account.gmailAccountIndex : undefined);
+                                            
+                                            return { ...account, gmailAccountIndex };
+                                          });
+                                          
+                                          setGmailAccounts(accountsWithLocalIndex);
+                                          if (accountsWithLocalIndex.length === 0) {
                                             setConnectedPlatforms(prev => prev.filter(p => p !== 'gmail'));
                                           }
                                         } catch (err) {

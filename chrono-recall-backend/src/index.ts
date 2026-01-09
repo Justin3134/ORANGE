@@ -63,7 +63,6 @@ app.get('/auth/gmail', initiateGmailAuth);
 app.get('/auth/gmail/callback', handleGmailCallback);
 app.get('/auth/gmail/status', getGmailStatus);
 app.post('/auth/gmail/disconnect', disconnectGmail);
-app.put('/api/gmail/account-index', updateGmailAccountIndex);
 
 // Discord OAuth routes
 app.get('/auth/discord', initiateDiscordAuth);
@@ -83,6 +82,9 @@ app.get('/integrations', getIntegrations);
 
 // Gmail sync route
 app.post('/api/sync-gmail', syncGmailMessages);
+
+// Gmail account index update route
+app.put('/api/gmail/account-index', updateGmailAccountIndex);
 
 // Label emails route
 app.post('/api/label-emails', labelEmails);
