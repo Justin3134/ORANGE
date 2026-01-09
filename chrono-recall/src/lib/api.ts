@@ -234,6 +234,28 @@ export async function disconnectGmailAccount(userId: string = DEFAULT_USER_ID, e
   return res.json();
 }
 
+// Update Gmail account index mapping
+export async function updateGmailAccountIndex(
+  userId: string = DEFAULT_USER_ID,
+  emailId: string,
+  gmailAccountIndex: number
+) {
+  const res = await fetch(`${BACKEND_URL}/api/gmail/account-index`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ userId, emailId, gmailAccountIndex }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.error || "Failed to update account index");
+  }
+
+  return res.json();
+}
+
 // Get recent memories
 export async function getRecentMemories(userId: string = DEFAULT_USER_ID, limit: number = 5) {
   const res = await fetch(`${BACKEND_URL}/api/memories/recent?userId=${userId}&limit=${limit}`);

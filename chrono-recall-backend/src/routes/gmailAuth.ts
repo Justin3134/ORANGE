@@ -14,6 +14,7 @@ interface GmailAccount {
   email: string;
   name: string;
   connectedAt: string;
+  gmailAccountIndex?: number; // Gmail URL index (u/0, u/1, etc.) for this browser
 }
 
 // Token store structure: Map<userId, Map<emailId, GmailAccount>>
@@ -77,7 +78,8 @@ function saveTokens(store: TokenStore) {
           tokens: account.tokens, // OAuth tokens are already plain objects
           email: account.email,
           name: account.name,
-          connectedAt: account.connectedAt
+          connectedAt: account.connectedAt,
+          gmailAccountIndex: account.gmailAccountIndex // Include Gmail account index
         };
       }
       data[userId] = accountsObj;
@@ -109,7 +111,8 @@ function saveTokens(store: TokenStore) {
             tokens: account.tokens,
             email: account.email,
             name: account.name,
-            connectedAt: account.connectedAt
+            connectedAt: account.connectedAt,
+            gmailAccountIndex: account.gmailAccountIndex // Include Gmail account index
           };
         }
         data[userId] = accountsObj;
@@ -248,21 +251,23 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
     const existingAccount = userAccounts.get(emailId);
     if (existingAccount) {
       console.log(`🔄 Updating existing Gmail account tokens for user ${actualUserId}: ${userEmail}`);
-      // Update tokens but keep original connectedAt timestamp
+      // Update tokens but keep original connectedAt timestamp and gmailAccountIndex
       userAccounts.set(emailId, {
         tokens,
         email: userEmail,
         name: userName,
-        connectedAt: existingAccount.connectedAt
+        connectedAt: existingAccount.connectedAt,
+        gmailAccountIndex: existingAccount.gmailAccountIndex // Preserve existing index mapping
       });
     } else {
       console.log(`➕ Adding NEW Gmail account to user ${actualUserId}: ${userEmail} (total accounts will be: ${userAccounts.size + 1})`);
-      // Add new account to the user's account map
+      // Add new account to the user's account map (no index set yet - user will configure it)
       userAccounts.set(emailId, {
         tokens,
         email: userEmail,
         name: userName,
         connectedAt: new Date().toISOString()
+        // gmailAccountIndex will be undefined until user sets it
       });
     }
     
@@ -341,20 +346,21 @@ export function getAuthenticatedClient(userId: string) {
 /**
  * Get all OAuth2 clients for all Gmail accounts of a user
  */
-export function getAllAuthenticatedClients(userId: string): Array<{ email: string; client: any }> {
+export function getAllAuthenticatedClients(userId: string): Array<{ email: string; client: any; gmailAccountIndex?: number }> {
   const userAccounts = tokenStore.get(userId);
   if (!userAccounts || userAccounts.size === 0) {
     return [];
   }
 
-  const clients: Array<{ email: string; client: any }> = [];
+  const clients: Array<{ email: string; client: any; gmailAccountIndex?: number }> = [];
   for (const [emailId, account] of userAccounts.entries()) {
     try {
       const oauth2Client = createOAuth2Client();
       oauth2Client.setCredentials(account.tokens);
       clients.push({
         email: account.email,
-        client: oauth2Client
+        client: oauth2Client,
+        gmailAccountIndex: account.gmailAccountIndex // Include Gmail account index
       });
     } catch (err) {
       console.error(`Error creating client for account ${account.email}:`, err);
@@ -525,7 +531,7 @@ export function getGmailAccountCount(userId: string): number {
 /**
  * Get all Gmail accounts for a user (for internal use)
  */
-export function getGmailAccounts(userId: string): Array<{ email: string; name: string; connectedAt: string }> {
+export function getGmailAccounts(userId: string): Array<{ email: string; name: string; connectedAt: string; gmailAccountIndex?: number }> {
   const userAccounts = tokenStore.get(userId);
   if (!userAccounts) {
     return [];
@@ -533,9 +539,56 @@ export function getGmailAccounts(userId: string): Array<{ email: string; name: s
   return Array.from(userAccounts.values()).map(acc => ({
     email: acc.email,
     name: acc.name,
-    connectedAt: acc.connectedAt
+    connectedAt: acc.connectedAt,
+    gmailAccountIndex: acc.gmailAccountIndex // Include Gmail account index
   }));
 }
+
+/**
+ * Update Gmail account index mapping
+ * PUT /api/gmail/account-index
+ */
+export const updateGmailAccountIndex = (req: Request, res: Response) => {
+  const { userId, emailId, gmailAccountIndex } = req.body;
+
+  if (!userId || !emailId || gmailAccountIndex === undefined) {
+    return res.status(400).json({ error: 'userId, emailId, and gmailAccountIndex are required' });
+  }
+
+  try {
+    const userAccounts = tokenStore.get(userId);
+    if (!userAccounts) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const account = userAccounts.get(emailId);
+    if (!account) {
+      return res.status(404).json({ error: 'Gmail account not found' });
+    }
+
+    // Validate index is a number between 0 and 10
+    const index = parseInt(String(gmailAccountIndex), 10);
+    if (isNaN(index) || index < 0 || index > 10) {
+      return res.status(400).json({ error: 'gmailAccountIndex must be a number between 0 and 10' });
+    }
+
+    // Update the account index
+    account.gmailAccountIndex = index;
+    userAccounts.set(emailId, account);
+    saveTokens(tokenStore);
+
+    console.log(`✅ Updated Gmail account index for ${account.email}: u/${account.gmailAccountIndex}`);
+
+    res.json({
+      success: true,
+      email: account.email,
+      gmailAccountIndex: account.gmailAccountIndex
+    });
+  } catch (err: any) {
+    console.error('Error updating Gmail account index:', err);
+    res.status(500).json({ error: 'Failed to update account index' });
+  }
+};
 
 /**
  * Create or get Gmail label

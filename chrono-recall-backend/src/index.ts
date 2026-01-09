@@ -17,7 +17,8 @@ import {
   isGmailConnected,
   labelEmails,
   getGmailAccountCount,
-  getGmailAccounts
+  getGmailAccounts,
+  updateGmailAccountIndex
 } from './routes/gmailAuth';
 import { getMemorySignals } from './routes/memories';
 import {
@@ -62,6 +63,7 @@ app.get('/auth/gmail', initiateGmailAuth);
 app.get('/auth/gmail/callback', handleGmailCallback);
 app.get('/auth/gmail/status', getGmailStatus);
 app.post('/auth/gmail/disconnect', disconnectGmail);
+app.put('/api/gmail/account-index', updateGmailAccountIndex);
 
 // Discord OAuth routes
 app.get('/auth/discord', initiateDiscordAuth);

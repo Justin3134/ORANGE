@@ -23,12 +23,13 @@ import {
   Camera,
   MessageCircle,
   ExternalLink,
+  Info,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { getUserStatus, disconnectService, connectGmail, connectDiscord, getDiscordStatus, disconnectDiscord, getGmailStatus, disconnectGmailAccount } from "@/lib/api";
+import { getUserStatus, disconnectService, connectGmail, connectDiscord, getDiscordStatus, disconnectDiscord, getGmailStatus, disconnectGmailAccount, updateGmailAccountIndex } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/contexts/UserContext";
 
@@ -41,7 +42,9 @@ const Settings = () => {
   const [autoSync, setAutoSync] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [connectedServices, setConnectedServices] = useState<string[]>([]);
-  const [gmailAccounts, setGmailAccounts] = useState<Array<{ email: string; name: string; connectedAt: string }>>([]);
+  const [gmailAccounts, setGmailAccounts] = useState<Array<{ email: string; name: string; connectedAt: string; gmailAccountIndex?: number }>>([]);
+  const [editingIndex, setEditingIndex] = useState<string | null>(null);
+  const [indexValue, setIndexValue] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [memoriesCount, setMemoriesCount] = useState(0);
@@ -222,6 +225,20 @@ const Settings = () => {
     }
   };
 
+  // Handle update Gmail account index
+  const handleUpdateIndex = async (emailId: string, email: string) => {
+    try {
+      await updateGmailAccountIndex(userId, emailId, indexValue);
+      // Reload Gmail accounts
+      const gmailStatus = await getGmailStatus(userId);
+      setGmailAccounts(gmailStatus.accounts || []);
+      setEditingIndex(null);
+    } catch (err: any) {
+      console.error("Failed to update index:", err);
+      alert(err.message || "Failed to update Gmail account index");
+    }
+  };
+
   // Discord bot invite URL - built client-side to avoid async issues
   const DISCORD_BOT_INVITE_URL = `https://discord.com/api/oauth2/authorize?client_id=1448501908456341545&permissions=537259072&scope=bot`;
 
@@ -363,6 +380,7 @@ const Settings = () => {
                 <div className="ml-14 space-y-2 mt-3">
                   {gmailAccounts.map((account, index) => {
                     const emailId = account.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                    const isEditing = editingIndex === emailId;
                     return (
                       <div
                         key={emailId}
@@ -382,21 +400,96 @@ const Settings = () => {
                             Connected {new Date(account.connectedAt).toLocaleDateString()}
                           </p>
                         </div>
-                        {gmailAccounts.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDisconnectGmailAccount(emailId)}
-                            disabled={isDisconnecting}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                          >
-                            {isDisconnecting ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                        <div className="flex items-center gap-2">
+                          {/* Gmail Account Index */}
+                          <div className="flex items-center gap-1">
+                            <span className={cn("text-xs", darkMode ? "text-white/60" : "text-muted-foreground")}>
+                              Index:
+                            </span>
+                            {isEditing ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="10"
+                                  value={indexValue}
+                                  onChange={(e) => setIndexValue(parseInt(e.target.value) || 0)}
+                                  className="w-16 h-7 text-xs"
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2"
+                                  onClick={() => handleUpdateIndex(emailId, account.email)}
+                                >
+                                  <Check className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2"
+                                  onClick={() => setEditingIndex(null)}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
                             ) : (
-                              <Trash2 className="w-4 h-4" />
+                              <div className="flex items-center gap-1">
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded text-xs font-mono",
+                                  darkMode ? "bg-white/10 text-white" : "bg-background text-foreground border border-border"
+                                )}>
+                                  u/{account.gmailAccountIndex ?? '?'}
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    setEditingIndex(emailId);
+                                    setIndexValue(account.gmailAccountIndex ?? 0);
+                                  }}
+                                  className={cn(
+                                    "text-xs hover:underline",
+                                    darkMode ? "text-white/60 hover:text-white" : "text-muted-foreground hover:text-foreground"
+                                  )}
+                                >
+                                  Edit
+                                </button>
+                                {/* Info icon with tooltip */}
+                                <div className="relative group">
+                                  <Info className={cn(
+                                    "w-3.5 h-3.5 cursor-help",
+                                    darkMode ? "text-white/40" : "text-muted-foreground"
+                                  )} />
+                                  <div className={cn(
+                                    "absolute bottom-full right-0 mb-2 w-72 p-3 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none",
+                                    darkMode ? "bg-black/90 border border-white/20" : "bg-popover border border-border"
+                                  )}>
+                                    <p className={cn("text-xs leading-relaxed", darkMode ? "text-white" : "text-foreground")}>
+                                      <strong>Gmail Account Index:</strong><br />
+                                      Open Gmail and make sure you're viewing this email account. Then look at the number in the address bar (u/0, u/1, etc.) and enter it here. This helps Recall Jump open emails in the correct Gmail account.
+                                      <br /><br />
+                                      <strong>Note:</strong> This number may change if you add/remove Google accounts or use a different browser/device.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
                             )}
-                          </Button>
-                        )}
+                          </div>
+                          {gmailAccounts.length > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDisconnectGmailAccount(emailId)}
+                              disabled={isDisconnecting}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            >
+                              {isDisconnecting ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

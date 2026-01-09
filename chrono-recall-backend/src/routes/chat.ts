@@ -221,7 +221,8 @@ async function searchSingleGmailAccount(
   accountEmail: string,
   query: string,
   accountIndex: number = 0,
-  maxResults: number = 20
+  maxResults: number = 20,
+  gmailAccountIndex?: number
 ): Promise<any[]> {
   try {
     console.log(`🔍 Searching Gmail account ${accountEmail} with query: "${query || '(recent emails)'}"`);
@@ -279,7 +280,10 @@ async function searchSingleGmailAccount(
         // Use Gmail's thread view URL format - this opens the thread directly
         // Format: /mail/u/0/#inbox/{threadId} - Gmail recognizes this as a direct thread link
         // This should open the email thread directly, not search
-        const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${threadIdStr}`;
+        // Use Gmail's thread view URL with the mapped account index
+        // Default to 0 if not mapped, but prefer the mapped index
+        const gmailIndex = gmailAccountIndex !== undefined ? gmailAccountIndex : 0;
+        const gmailUrl = `https://mail.google.com/mail/u/${gmailIndex}/#inbox/${threadIdStr}`;
 
         fetchedMessages.push({
           id: msg.id,
@@ -322,10 +326,10 @@ async function searchGmail(userId: string, query: string): Promise<any[]> {
 
   console.log(`🔍 Searching ${accountClients.length} Gmail account(s) for user ${userId}`);
 
-  // Search all accounts in parallel, passing account index for proper URL generation
-  const searchPromises = accountClients.map(({ email, client }, index) => {
+  // Search all accounts in parallel, passing account index and Gmail account index for proper URL generation
+  const searchPromises = accountClients.map(({ email, client, gmailAccountIndex }, index) => {
     const gmail = google.gmail({ version: 'v1', auth: client });
-    return searchSingleGmailAccount(gmail, email, query, index, 20);
+    return searchSingleGmailAccount(gmail, email, query, index, 20, gmailAccountIndex);
   });
 
   try {
