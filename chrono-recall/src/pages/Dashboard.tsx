@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { User, ChevronRight, Sparkles, Filter, Search, Brain } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
@@ -16,7 +16,7 @@ import { useUser } from "@/contexts/UserContext";
 import { toast } from "sonner";
 
 const Dashboard = () => {
-  const { user, login } = useUser();
+  const { user, login, isAuthenticated } = useUser();
   const userId = user?.id || 'guest';
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -31,8 +31,9 @@ const Dashboard = () => {
   const [isLoadingMemories, setIsLoadingMemories] = useState(false);
   const location = useLocation();
 
-  // Fetch memory signals when connected
-  const fetchRecentMemories = async () => {
+  // Fetch memory signals when connected - memoized with useCallback
+  const fetchRecentMemories = useCallback(async () => {
+    if (userId === 'guest') return;
     setIsLoadingMemories(true);
     try {
       const data = await getMemorySignals(userId, 5);
@@ -43,7 +44,7 @@ const Dashboard = () => {
     } finally {
       setIsLoadingMemories(false);
     }
-  };
+  }, [userId]);
 
   // Handle OAuth callback - refresh status without changing userId
   useEffect(() => {
@@ -57,22 +58,75 @@ const Dashboard = () => {
     const callbackUserId = urlParams.get('userId'); // Get userId from redirect
 
     if (gmailConnectedParam === 'true' || discordConnectedParam === 'true' || slackConnectedParam === 'true') {
+      const refreshStatusAfterOAuth = async (useUserId: string | null) => {
+        if (!useUserId || useUserId === 'guest') {
+          console.warn('Cannot refresh status: invalid userId', useUserId);
+          return;
+        }
+
+        try {
+          const status = await getUserStatus(useUserId);
+          setConnectedPlatforms(status.connectedServices || []);
+          
+          if (status.connectedServices?.includes('gmail')) {
+            setGmailConnected(true);
+            setHasSyncedData(true);
+            // Fetch memories with the correct userId
+            setIsLoadingMemories(true);
+            try {
+              const data = await getMemorySignals(useUserId, 5);
+              setMemorySignals(data.memories || []);
+            } catch (err) {
+              console.error("Failed to fetch memory signals:", err);
+              setMemorySignals([]);
+            } finally {
+              setIsLoadingMemories(false);
+            }
+          }
+          if (status.connectedServices?.includes('discord')) {
+            setHasSyncedData(true);
+          }
+          if (status.connectedServices?.includes('slack')) {
+            setHasSyncedData(true);
+          }
+        } catch (err) {
+          console.error("Failed to refresh status after OAuth:", err);
+        }
+      };
+
+      // Determine which userId to use
+      // Priority: callbackUserId > generated from email > current userId
+      let targetUserId: string | null = null;
+      
+      if (callbackUserId) {
+        targetUserId = callbackUserId;
+      } else if (email) {
+        // Generate userId from email (same logic as UserContext)
+        targetUserId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      } else {
+        targetUserId = userId !== 'guest' ? userId : null;
+      }
+
       // Only login if user is not already authenticated
       // This prevents changing userId when adding additional accounts
       if (!user || !isAuthenticated) {
         if (email) {
           login(email, name || undefined);
-          // Wait for login to complete before refreshing status
-          setTimeout(() => {
-            refreshStatusAfterOAuth();
-          }, 100);
-        } else {
-          refreshStatusAfterOAuth();
+          // Wait for login to complete, then refresh with targetUserId
+          if (targetUserId) {
+            setTimeout(() => {
+              refreshStatusAfterOAuth(targetUserId);
+            }, 300);
+          }
+        } else if (targetUserId) {
+          refreshStatusAfterOAuth(targetUserId);
         }
       } else {
-        // User is already logged in, just refresh status
-        // Use the userId from redirect params if available, otherwise use current userId
-        refreshStatusAfterOAuth(callbackUserId || undefined);
+        // User is already logged in, just refresh status with targetUserId or current userId
+        const refreshUserId = targetUserId || (userId !== 'guest' ? userId : null);
+        if (refreshUserId) {
+          refreshStatusAfterOAuth(refreshUserId);
+        }
       }
 
       const service = gmailConnectedParam ? 'Gmail' : discordConnectedParam ? 'Discord' : 'Slack';
@@ -80,30 +134,6 @@ const Dashboard = () => {
 
       // Clean up URL immediately
       window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    async function refreshStatusAfterOAuth(useUserId?: string) {
-      const currentUserId = useUserId || userId;
-      if (currentUserId === 'guest') return;
-
-      try {
-        const status = await getUserStatus(currentUserId);
-        setConnectedPlatforms(status.connectedServices || []);
-        
-        if (status.connectedServices?.includes('gmail')) {
-          setGmailConnected(true);
-          setHasSyncedData(true);
-          fetchRecentMemories();
-        }
-        if (status.connectedServices?.includes('discord')) {
-          setHasSyncedData(true);
-        }
-        if (status.connectedServices?.includes('slack')) {
-          setHasSyncedData(true);
-        }
-      } catch (err) {
-        console.error("Failed to refresh status after OAuth:", err);
-      }
     }
   }, [login, user, isAuthenticated, userId]);
 
@@ -133,7 +163,7 @@ const Dashboard = () => {
       }
     };
     checkStatus();
-  }, [userId]);
+  }, [userId, fetchRecentMemories]);
 
   // Function to search the backend with AI
   const handleSearch = async (query: string) => {
