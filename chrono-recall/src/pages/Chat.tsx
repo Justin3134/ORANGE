@@ -701,36 +701,22 @@ const Chat = () => {
                                   if (source.platform === 'gmail' && source.url) {
                                     e.preventDefault();
                                     
-                                    // Extract thread ID from URL (format: #all/<threadId> or #inbox/<threadId>)
-                                    const threadIdMatch = source.url.match(/#(?:all|inbox)\/([^/?]+)/);
+                                    // Extract thread ID from URL (format: #inbox/<threadId>)
+                                    const threadIdMatch = source.url.match(/#inbox\/([^/?]+)/);
                                     const threadId = threadIdMatch ? threadIdMatch[1] : null;
                                     
                                     if (threadId) {
-                                      // Use #all/ format which works regardless of folder
-                                      // Start with account index 0 (default account)
-                                      const gmailUrl = `https://mail.google.com/mail/u/0/#all/${threadId}`;
+                                      // Use #inbox/ format - Gmail recognizes this as direct thread link
+                                      // This should open the thread directly, not search
+                                      const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
                                       
                                       // Open the URL directly - this should open the thread, not search
                                       window.open(gmailUrl, '_blank', 'noopener,noreferrer');
                                       
                                       console.log(`Opening Gmail thread: ${threadId} for account: ${source.accountEmail || 'default'}`);
                                     } else {
-                                      // Fallback: try to use the URL as-is, but ensure it's not a search URL
-                                      // If it contains "search", try to extract thread ID from message ID
-                                      if (source.url.includes('search')) {
-                                        const msgIdMatch = source.url.match(/rfc822msgid:([^&]+)/);
-                                        if (msgIdMatch) {
-                                          // If we have message ID but no thread ID, use message ID directly
-                                          // Gmail might be able to find it
-                                          const msgId = msgIdMatch[1];
-                                          const gmailUrl = `https://mail.google.com/mail/u/0/#search/rfc822msgid:${msgId}`;
-                                          window.open(gmailUrl, '_blank', 'noopener,noreferrer');
-                                        } else {
-                                          window.open(source.url, '_blank', 'noopener,noreferrer');
-                                        }
-                                      } else {
-                                        window.open(source.url, '_blank', 'noopener,noreferrer');
-                                      }
+                                      // Fallback: use the URL as-is
+                                      window.open(source.url, '_blank', 'noopener,noreferrer');
                                     }
                                   }
                                 };
@@ -738,10 +724,11 @@ const Chat = () => {
                                 // Construct the correct Gmail URL for href (fallback if onClick doesn't work)
                                 const getGmailUrl = () => {
                                   if (source.platform === 'gmail' && source.url) {
-                                    // Extract thread ID from URL
-                                    const threadIdMatch = source.url.match(/#(?:all|inbox)\/([^/?]+)/);
+                                    // Extract thread ID from URL (format: #inbox/<threadId>)
+                                    const threadIdMatch = source.url.match(/#inbox\/([^/?]+)/);
                                     if (threadIdMatch) {
-                                      return `https://mail.google.com/mail/u/0/#all/${threadIdMatch[1]}`;
+                                      // Use #inbox/ format - Gmail recognizes this as direct thread link
+                                      return `https://mail.google.com/mail/u/0/#inbox/${threadIdMatch[1]}`;
                                     }
                                   }
                                   return source.url || '#';

@@ -247,6 +247,12 @@ async function searchSingleGmailAccount(
 
         // Get thread ID from the message - this is crucial for direct email opening
         const threadId = fullMessage.data.threadId || msg.id;
+        
+        // Ensure thread ID is a string (Gmail thread IDs are strings)
+        const threadIdStr = String(threadId);
+        
+        // Log to verify thread ID format for debugging
+        console.log(`📧 Message ${msg.id} - Thread ID: ${threadIdStr} (from account: ${accountEmail})`);
 
         const headers = fullMessage.data.payload?.headers || [];
         const getHeader = (name: string) =>
@@ -270,14 +276,14 @@ async function searchSingleGmailAccount(
           }
         }
 
-        // Use direct thread URL - this opens the email directly instead of searching
-        // Format: /mail/u/0/#all/<threadId> - this opens the thread containing the message
-        // Using #all/ instead of #inbox/ ensures it works regardless of which folder the email is in
-        const gmailUrl = `https://mail.google.com/mail/u/0/#all/${threadId}`;
+        // Use Gmail's thread view URL format - this opens the thread directly
+        // Format: /mail/u/0/#inbox/{threadId} - Gmail recognizes this as a direct thread link
+        // This should open the email thread directly, not search
+        const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${threadIdStr}`;
 
         fetchedMessages.push({
           id: msg.id,
-          threadId: threadId, // Store thread ID for reference
+          threadId: threadIdStr, // Store thread ID as string for reference
           subject: getHeader('Subject'),
           from: getHeader('From'),
           to: getHeader('To'),
@@ -285,6 +291,7 @@ async function searchSingleGmailAccount(
           snippet: fullMessage.data.snippet,
           body: body.substring(0, 1500),
           // Use direct thread URL - opens email directly, not search
+          // Format: #inbox/{threadId} - Gmail should recognize this and open the thread
           url: gmailUrl,
           accountEmail, // Add account identifier
           accountIndex // Store account index for reference
