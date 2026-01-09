@@ -245,6 +245,9 @@ async function searchSingleGmailAccount(
           format: 'full'
         });
 
+        // Get thread ID from the message - this is crucial for direct email opening
+        const threadId = fullMessage.data.threadId || msg.id;
+
         const headers = fullMessage.data.payload?.headers || [];
         const getHeader = (name: string) =>
           headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
@@ -267,17 +270,22 @@ async function searchSingleGmailAccount(
           }
         }
 
+        // Use direct thread URL - this opens the email directly instead of searching
+        // Format: /mail/u/0/#inbox/<threadId> - this opens the thread containing the message
+        // For multiple accounts, we'll use u/0 as default and include account email for context
+        const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
+
         fetchedMessages.push({
           id: msg.id,
+          threadId: threadId, // Store thread ID for reference
           subject: getHeader('Subject'),
           from: getHeader('From'),
           to: getHeader('To'),
           date: getHeader('Date'),
           snippet: fullMessage.data.snippet,
           body: body.substring(0, 1500),
-          // Use Gmail URL with authuser parameter to route to specific account
-          // This ensures Gmail opens the correct account where the message exists
-          url: `https://mail.google.com/mail/u/0/?authuser=${encodeURIComponent(accountEmail)}#search/rfc822msgid:${msg.id}`,
+          // Use direct thread URL - opens email directly, not search
+          url: gmailUrl,
           accountEmail, // Add account identifier
           accountIndex // Store account index for reference
         });

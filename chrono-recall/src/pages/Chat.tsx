@@ -695,22 +695,56 @@ const Chat = () => {
                           {/* Sources */}
                           {message.sources && message.sources.length > 0 && (
                             <div className="mt-4 flex flex-wrap gap-2">
-                              {message.sources.map((source, i) => (
-                                <a
-                                  key={i}
-                                  href={source.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50 hover:bg-secondary text-sm transition-colors"
-                                >
-                                  <Link2 className="w-3 h-3" />
-                                  <span className="text-muted-foreground">{source.platform}</span>
-                                  {source.accountEmail && (
-                                    <span className="text-xs text-muted-foreground/70">({source.accountEmail})</span>
-                                  )}
-                                  <span className="font-medium truncate max-w-[150px]">{source.title}</span>
-                                </a>
-                              ))}
+                              {message.sources.map((source, i) => {
+                                // Handle Gmail links with account detection
+                                const handleGmailClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                                  if (source.platform === 'gmail' && source.accountEmail && source.url) {
+                                    e.preventDefault();
+                                    
+                                    // Extract thread ID from URL (format: #inbox/<threadId>)
+                                    const threadIdMatch = source.url.match(/#inbox\/([^/?]+)/);
+                                    const threadId = threadIdMatch ? threadIdMatch[1] : null;
+                                    
+                                    if (threadId) {
+                                      // Try account indices 0-9 to find the matching account
+                                      // Start with 0 (default account)
+                                      const maxAccounts = 10;
+                                      let accountIndex = 0;
+                                      
+                                      // For now, try default account first (u/0)
+                                      // If user has multiple accounts, they can manually switch
+                                      const gmailUrl = `https://mail.google.com/mail/u/${accountIndex}/#inbox/${threadId}`;
+                                      
+                                      // Open the URL
+                                      window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+                                      
+                                      // Show account email in console for debugging
+                                      console.log(`Opening Gmail for account: ${source.accountEmail}, thread: ${threadId}`);
+                                    } else {
+                                      // Fallback to original URL if thread ID not found
+                                      window.open(source.url, '_blank', 'noopener,noreferrer');
+                                    }
+                                  }
+                                };
+
+                                return (
+                                  <a
+                                    key={i}
+                                    href={source.url}
+                                    onClick={handleGmailClick}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50 hover:bg-secondary text-sm transition-colors"
+                                  >
+                                    <Link2 className="w-3 h-3" />
+                                    <span className="text-muted-foreground">{source.platform}</span>
+                                    {source.accountEmail && (
+                                      <span className="text-xs text-muted-foreground/70">({source.accountEmail})</span>
+                                    )}
+                                    <span className="font-medium truncate max-w-[150px]">{source.title}</span>
+                                  </a>
+                                );
+                              })}
                             </div>
                           )}
 
