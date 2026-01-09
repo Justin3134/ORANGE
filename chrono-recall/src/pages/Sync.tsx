@@ -80,22 +80,30 @@ const Sync = () => {
     if (gmailConnected || gmailAccountAdded) {
       // Refresh all status after OAuth callback
       const refreshAfterOAuth = async () => {
-        const currentUserId = callbackUserId || userId;
-        try {
-          const status = await getUserStatus(currentUserId);
-          setConnectedPlatforms(status.connectedServices || []);
-          
-          // Load Gmail accounts if Gmail is connected
-          if (status.connectedServices?.includes('gmail')) {
-            try {
-              const gmailStatus = await getGmailStatus(currentUserId);
-              setGmailAccounts(gmailStatus.accounts || []);
-            } catch (err) {
-              console.error("Failed to load Gmail status:", err);
+        // When user is logged in, always use current userId (where accounts are stored)
+        // Only use callbackUserId if user is not logged in
+        const currentUserId = (user && userId !== 'guest') ? userId : (callbackUserId || userId);
+        
+        console.log(`🔄 Sync: Refreshing accounts for userId: ${currentUserId} (current: ${userId}, callback: ${callbackUserId})`);
+        
+        if (currentUserId && currentUserId !== 'guest') {
+          try {
+            const status = await getUserStatus(currentUserId);
+            setConnectedPlatforms(status.connectedServices || []);
+            
+            // Load Gmail accounts if Gmail is connected
+            if (status.connectedServices?.includes('gmail')) {
+              try {
+                const gmailStatus = await getGmailStatus(currentUserId);
+                setGmailAccounts(gmailStatus.accounts || []);
+                console.log(`✅ Sync: Loaded ${gmailStatus.accounts?.length || 0} Gmail account(s)`);
+              } catch (err) {
+                console.error("Failed to load Gmail status:", err);
+              }
             }
+          } catch (err) {
+            console.error("Failed to refresh status after OAuth:", err);
           }
-        } catch (err) {
-          console.error("Failed to refresh status after OAuth:", err);
         }
       };
       

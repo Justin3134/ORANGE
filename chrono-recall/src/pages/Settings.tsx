@@ -112,17 +112,26 @@ const Settings = () => {
     if (gmailConnected || gmailAccountAdded) {
       // Refresh Gmail accounts after OAuth callback
       const refreshAfterOAuth = async () => {
-        const currentUserId = callbackUserId || userId;
-        try {
-          const status = await getUserStatus(currentUserId);
-          setConnectedServices(status.connectedServices || []);
-          
-          if (status.connectedServices?.includes('gmail')) {
-            const gmailStatus = await getGmailStatus(currentUserId);
-            setGmailAccounts(gmailStatus.accounts || []);
+        // When user is logged in, always use current userId (where accounts are stored)
+        // Only use callbackUserId if user is not logged in
+        // This ensures accounts added under current userId are retrieved correctly
+        const currentUserId = (user && userId !== 'guest') ? userId : (callbackUserId || userId);
+        
+        console.log(`🔄 Settings: Refreshing accounts for userId: ${currentUserId} (current: ${userId}, callback: ${callbackUserId})`);
+        
+        if (currentUserId && currentUserId !== 'guest') {
+          try {
+            const status = await getUserStatus(currentUserId);
+            setConnectedServices(status.connectedServices || []);
+            
+            if (status.connectedServices?.includes('gmail')) {
+              const gmailStatus = await getGmailStatus(currentUserId);
+              setGmailAccounts(gmailStatus.accounts || []);
+              console.log(`✅ Settings: Loaded ${gmailStatus.accounts?.length || 0} Gmail account(s)`);
+            }
+          } catch (err) {
+            console.error("Failed to refresh status after OAuth:", err);
           }
-        } catch (err) {
-          console.error("Failed to refresh status after OAuth:", err);
         }
       };
       

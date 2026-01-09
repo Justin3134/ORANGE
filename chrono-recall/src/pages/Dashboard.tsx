@@ -96,37 +96,44 @@ const Dashboard = () => {
       };
 
       // Determine which userId to use
-      // Priority: callbackUserId > generated from email > current userId
+      // When user is already logged in, ALWAYS use current userId (where accounts are stored)
+      // Only use callbackUserId/email if user is NOT logged in yet
       let targetUserId: string | null = null;
-      
-      if (callbackUserId) {
-        targetUserId = callbackUserId;
-      } else if (email) {
-        // Generate userId from email (same logic as UserContext)
-        targetUserId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+      if (!user || !isAuthenticated) {
+        // User not logged in yet - determine userId from callback
+        if (callbackUserId) {
+          targetUserId = callbackUserId;
+        } else if (email) {
+          // Generate userId from email (same logic as UserContext)
+          targetUserId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        } else {
+          targetUserId = null;
+        }
       } else {
+        // User is already logged in - ALWAYS use current userId (accounts are stored here)
+        // This is critical: when adding a second account, accounts are stored under current userId
         targetUserId = userId !== 'guest' ? userId : null;
+        console.log(`🔄 User already logged in, using current userId: ${targetUserId} (callback had: ${callbackUserId})`);
       }
 
       // Only login if user is not already authenticated
       // This prevents changing userId when adding additional accounts
       if (!user || !isAuthenticated) {
-        if (email) {
+        if (email && targetUserId) {
           login(email, name || undefined);
           // Wait for login to complete, then refresh with targetUserId
-          if (targetUserId) {
-            setTimeout(() => {
-              refreshStatusAfterOAuth(targetUserId);
-            }, 300);
-          }
+          setTimeout(() => {
+            refreshStatusAfterOAuth(targetUserId);
+          }, 300);
         } else if (targetUserId) {
           refreshStatusAfterOAuth(targetUserId);
         }
       } else {
-        // User is already logged in, just refresh status with targetUserId or current userId
-        const refreshUserId = targetUserId || (userId !== 'guest' ? userId : null);
-        if (refreshUserId) {
-          refreshStatusAfterOAuth(refreshUserId);
+        // User is already logged in - use current userId to fetch accounts
+        // This ensures we get accounts stored under the current userId
+        if (targetUserId && targetUserId !== 'guest') {
+          refreshStatusAfterOAuth(targetUserId);
         }
       }
 
