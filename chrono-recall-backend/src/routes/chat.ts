@@ -41,26 +41,35 @@ async function parseUserQuery(openai: OpenAI, userMessage: string): Promise<{
 Be generous - if something could be a name or keyword, include it.
 
 Return a JSON object with these fields:
-- names: array of full person names mentioned (e.g., "John Smith", "Shyam")
+- names: array of full person names mentioned (e.g., "John Smith", "Shyam", "Alyssa")
 - emails: array of email addresses mentioned (e.g., "john@example.com")
 - topics: array of topics/subjects being searched for (e.g., "budget", "meeting", "project")
 - dateHints: array of date references (e.g., "last week", "2023", "yesterday", "2 years ago")
 - keywords: array of other important search words from the query
 - partialNames: array of partial name hints (e.g., if user says "starts with shy" or "name like john", extract "shy", "john")
 
-IMPORTANT: 
-- Even if user just says a single name like "Shyam", extract it as a name
+CRITICAL RULES:
+- Extract names even from conversational queries like "chat with X", "emails from X", "conversation with X", "talk to X", etc.
+- If the user asks about someone (even as a question), extract that person's name
+- Even if user just says a single name like "Shyam" or "Alyssa", extract it as a name
 - If user says "shy" or mentions partial names, add to partialNames
 - Extract ANY word that could help find the email
+- Questions marks and conversational phrasing should NOT prevent name extraction
 
 Example 1: "Shyam"
 Output: {"names":["Shyam"],"emails":[],"topics":[],"dateHints":[],"keywords":[],"partialNames":[]}
 
-Example 2: "Find emails from someone named shy or shyam"
+Example 2: "chat with Alyssa?"
+Output: {"names":["Alyssa"],"emails":[],"topics":[],"dateHints":[],"keywords":["chat"],"partialNames":[]}
+
+Example 3: "Find emails from someone named shy or shyam"
 Output: {"names":["shyam"],"emails":[],"topics":[],"dateHints":[],"keywords":["emails"],"partialNames":["shy"]}
 
-Example 3: "conversation about budget"
+Example 4: "conversation about budget"
 Output: {"names":[],"emails":[],"topics":["budget"],"dateHints":[],"keywords":["conversation"],"partialNames":[]}
+
+Example 5: "emails from John"
+Output: {"names":["John"],"emails":[],"topics":[],"dateHints":[],"keywords":["emails"],"partialNames":[]}
 
 Only return valid JSON, no other text.`
         },
@@ -266,9 +275,9 @@ async function searchSingleGmailAccount(
           date: getHeader('Date'),
           snippet: fullMessage.data.snippet,
           body: body.substring(0, 1500),
-          // Use Gmail URL with account email in search to route to correct account
-          // Gmail will find the message in the specific account where it exists
-          url: `https://mail.google.com/mail/u/0/#search/${encodeURIComponent(accountEmail)}+rfc822msgid:${msg.id}`,
+          // Use Gmail URL with authuser parameter to route to specific account
+          // This ensures Gmail opens the correct account where the message exists
+          url: `https://mail.google.com/mail/u/0/?authuser=${encodeURIComponent(accountEmail)}#search/rfc822msgid:${msg.id}`,
           accountEmail, // Add account identifier
           accountIndex // Store account index for reference
         });
@@ -443,16 +452,23 @@ export const handleChat = async (req: Request, res: Response) => {
     const allContext = [emailContext, discordContext, slackContext].filter(Boolean).join('\n\n===\n\n');
 
     // Create the AI prompt with matched messages
-    const systemPrompt = `You are a helpful AI assistant that helps users search and understand their conversations across email and Discord.
-You have access to the user's emails and Discord messages that match their search query.
-When answering, be specific and cite relevant sources (mention sender, channel/subject, date).
+    const systemPrompt = `You are a helpful AI assistant that helps users search and understand their conversations across email, Discord, and Slack.
+You have access to the user's emails and messages that match their search query.
+When answering, be specific and cite relevant sources (mention sender, channel/subject, date, account email).
 If you found relevant content, summarize what you found.
-Clearly indicate whether information comes from email or Discord.
-If no messages match what the user is looking for, let them know clearly.
+Clearly indicate whether information comes from email, Discord, or Slack.
+
+IMPORTANT GUIDELINES:
+- If the user asks about a person (like "chat with Alyssa" or "emails from John"), search for that person's name in the messages provided
+- Even if the query is phrased as a question, still search for the mentioned names/terms in the provided messages
+- Be proactive - if messages are provided, analyze them thoroughly for relevant content
+- If you found messages, always provide a summary even if they don't perfectly match the query
+- Only say "no information available" if NO messages were provided at all
+- If messages are provided but don't seem relevant, still mention what you found and suggest the user might want to refine their search
 
 ${allContext
-        ? `Here are the messages matching the user's search:\n\n${allContext}`
-        : 'No matching messages were found for this search.'}`;
+        ? `Here are the messages matching the user's search:\n\n${allContext}\n\nAnalyze these messages and provide a helpful response based on what you found.`
+        : 'No matching messages were found for this search. Try searching with a specific name, email address, or topic.'}`;
 
     // Step 6: Get AI response with better error handling
     let aiResponse: string;
