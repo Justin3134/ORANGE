@@ -271,9 +271,9 @@ async function searchSingleGmailAccount(
         }
 
         // Use direct thread URL - this opens the email directly instead of searching
-        // Format: /mail/u/0/#inbox/<threadId> - this opens the thread containing the message
-        // For multiple accounts, we'll use u/0 as default and include account email for context
-        const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
+        // Format: /mail/u/0/#all/<threadId> - this opens the thread containing the message
+        // Using #all/ instead of #inbox/ ensures it works regardless of which folder the email is in
+        const gmailUrl = `https://mail.google.com/mail/u/0/#all/${threadId}`;
 
         fetchedMessages.push({
           id: msg.id,
