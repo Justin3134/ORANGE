@@ -211,6 +211,7 @@ async function searchSingleGmailAccount(
   gmail: any,
   accountEmail: string,
   query: string,
+  accountIndex: number = 0,
   maxResults: number = 20
 ): Promise<any[]> {
   try {
@@ -265,8 +266,10 @@ async function searchSingleGmailAccount(
           date: getHeader('Date'),
           snippet: fullMessage.data.snippet,
           body: body.substring(0, 1500),
-          url: `https://mail.google.com/mail/u/0/#inbox/${msg.id}`,
-          accountEmail // Add account identifier
+          // Use account index in URL to redirect to the correct Gmail account
+          url: `https://mail.google.com/mail/u/${accountIndex}/#inbox/${msg.id}`,
+          accountEmail, // Add account identifier
+          accountIndex // Store account index for reference
         });
       } catch (err) {
         console.error(`Error fetching message ${msg.id} from ${accountEmail}:`, err);
@@ -294,10 +297,10 @@ async function searchGmail(userId: string, query: string): Promise<any[]> {
 
   console.log(`🔍 Searching ${accountClients.length} Gmail account(s) for user ${userId}`);
 
-  // Search all accounts in parallel
-  const searchPromises = accountClients.map(({ email, client }) => {
+  // Search all accounts in parallel, passing account index for proper URL generation
+  const searchPromises = accountClients.map(({ email, client }, index) => {
     const gmail = google.gmail({ version: 'v1', auth: client });
-    return searchSingleGmailAccount(gmail, email, query, 20);
+    return searchSingleGmailAccount(gmail, email, query, index, 20);
   });
 
   try {
@@ -509,6 +512,7 @@ ${allContext
       // Add fields for labeling feature
       totalGmailCount: gmailMessages.length,
       allGmailIds: gmailMessages.map(m => m.id), // All email IDs for labeling
+      allGmailEmails: gmailMessages.map(m => ({ id: m.id, accountEmail: m.accountEmail, accountIndex: m.accountIndex })), // All emails with account info for labeling
       hasRelevantSources: allSources.length > 0
     });
 

@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { User, ChevronRight, Sparkles, Filter, Search, Brain } from "lucide-react";
+import { User, ChevronRight, Sparkles, Brain } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { syncFake, searchMemories, connectGmail, connectDiscord, syncGmail, getUserStatus, getMemorySignals } from "@/lib/api";
+import { syncFake, connectGmail, connectDiscord, syncGmail, getUserStatus, getMemorySignals } from "@/lib/api";
 import {
   SIDEBAR_ITEMS,
   TYPE_COLORS,
@@ -14,22 +13,20 @@ import {
 import { Mail } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { toast } from "sonner";
+import logo from "@/assets/logo.png";
 
 const Dashboard = () => {
   const { user, login, isLoading: userLoading } = useUser();
   const isAuthenticated = !!user;
   const userId = user?.id || 'guest';
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedResult, setSelectedResult] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [aiParsed, setAiParsed] = useState<any>(null);
-  const [isSearching, setIsSearching] = useState(false);
+  // Removed search-related state since search bar was removed
   const [hasSyncedData, setHasSyncedData] = useState(false);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [memorySignals, setMemorySignals] = useState<any[]>([]);
   const [isLoadingMemories, setIsLoadingMemories] = useState(false);
+  const [selectedResult, setSelectedResult] = useState<string | null>(null);
   const location = useLocation();
 
   // Fetch memory signals when connected - memoized with useCallback
@@ -189,47 +186,7 @@ const Dashboard = () => {
     checkStatus();
   }, [userId, fetchRecentMemories]);
 
-  // Function to search the backend with AI
-  const handleSearch = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      setAiParsed(null);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const data = await searchMemories(userId, query);
-      console.log("AI Search results:", data);
-
-      // Store AI parsing results
-      setAiParsed(data.parsed);
-
-      // Transform results for UI
-      const transformedResults = (data.results || []).map(result => ({
-        id: result.item.id,
-        platform: result.item.platform,
-        title: result.item.title || `${result.item.platform} message`,
-        snippet: result.item.text,
-        timestamp: result.item.timestamp,
-        source: result.item.platform,
-        url: result.item.url,
-        score: result.score,
-        matchedFields: result.matchedFields
-      }));
-      setSearchResults(transformedResults);
-    } catch (error) {
-      console.error("Search error:", error);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  // Handle search input changes and trigger search
-  const handleSearchInput = (value: string) => {
-    setSearchQuery(value);
-    handleSearch(value);
-  };
+  // Search functionality removed - search bar was removed from Dashboard
 
   return (
     <div className="min-h-screen bg-background dark flex">
@@ -248,9 +205,7 @@ const Dashboard = () => {
         {/* Logo */}
         <div className="p-4 border-b border-border">
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-[hsl(199,89%,48%)] flex items-center justify-center shrink-0 shadow-lg shadow-primary/25">
-              <Sparkles className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="RecallJump" className="w-8 h-8 object-contain" />
             <span className="text-lg font-semibold text-foreground hidden lg:block">RecallJump</span>
           </Link>
         </div>
@@ -297,47 +252,6 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="flex-1 ml-16 lg:ml-64">
-        {/* Top Bar */}
-        <motion.header
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="sticky top-0 z-30 glass-nav px-6 py-4"
-        >
-          <div className="flex items-center gap-4 max-w-4xl mx-auto">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                variant="search"
-                placeholder={hasSyncedData ? "Ask about your memories..." : "Connect accounts to search your memories..."}
-                value={searchQuery}
-                onChange={(e) => handleSearchInput(e.target.value)}
-                className="w-full"
-                disabled={!hasSyncedData}
-              />
-            </div>
-            <Button
-              variant="glass"
-              size="sm"
-              className="shrink-0 mr-2"
-              onClick={async () => {
-                try {
-                  const data = await syncFake(userId);
-                  console.log("Synced data:", data);
-                  setHasSyncedData(true);
-                  alert(`Synced ${data.synced} memories from ${data.platforms.join(", ")}`);
-                } catch (error) {
-                  console.error("Sync error:", error);
-                }
-              }}
-            >
-              Sync Data
-            </Button>
-            <Button variant="glass" size="icon" className="shrink-0">
-              <Filter className="w-5 h-5" />
-            </Button>
-          </div>
-        </motion.header>
-
         {/* Results */}
         <div className="p-6 max-w-4xl mx-auto">
           <motion.div
@@ -346,48 +260,16 @@ const Dashboard = () => {
             transition={{ delay: 0.2 }}
             className="mb-6"
           >
-            <h2 className="text-sm font-medium text-muted-foreground">
-              {searchResults.length > 0
-                ? `Search Results ${isSearching ? '(Searching...)' : ''}`
-                : hasSyncedData
-                  ? 'Memory Signals'
-                  : 'Get Started'
-              }
-            </h2>
-
-            {/* AI Parsing Results */}
-            {aiParsed && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-3 p-4 bg-primary/5 rounded-lg border border-primary/20"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <Brain className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">AI Understanding</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  {aiParsed.nameHints.length > 0 && (
-                    <div>
-                      <span className="font-medium">Names:</span> {aiParsed.nameHints.join(", ")}
-                    </div>
-                  )}
-                  {aiParsed.topicHints.length > 0 && (
-                    <div>
-                      <span className="font-medium">Topics:</span> {aiParsed.topicHints.join(", ")}
-                    </div>
-                  )}
-                  {(aiParsed.dateFrom || aiParsed.dateTo) && (
-                    <div className="md:col-span-2">
-                      <span className="font-medium">Time Range:</span>{" "}
-                      {aiParsed.dateFrom ? new Date(aiParsed.dateFrom).toLocaleDateString() : "Any"}
-                      {" → "}
-                      {aiParsed.dateTo ? new Date(aiParsed.dateTo).toLocaleDateString() : "Any"}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
+            <h1 className="text-2xl font-semibold text-foreground mb-2">
+              What matters right now
+            </h1>
+            {hasSyncedData && (
+              <p className="text-sm text-muted-foreground">
+                AI-generated memory signals ranked by importance
+              </p>
             )}
+
+            {/* AI Parsing Results removed - search functionality removed */}
 
             {/* Connection Panel - Show when no data synced */}
             {!hasSyncedData && (
@@ -475,58 +357,7 @@ const Dashboard = () => {
           </motion.div>
 
           <div className="space-y-3">
-            {searchResults.length > 0 ? (
-              // Show search results
-              searchResults.map((result, i) => {
-                // Handle different result formats
-                const isSearchResult = searchResults.length > 0;
-                const resultType = result.platform || result.type;
-                const resultTitle = result.title || `${result.platform || result.type} message`;
-                const resultSource = result.source || result.platform;
-                const resultDate = result.timestamp ? new Date(result.timestamp).toLocaleDateString() : result.date;
-                const IconComponent = Search;
-
-                return (
-                  <motion.div
-                    key={result.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + i * 0.05 }}
-                    onClick={() => setSelectedResult(result.id)}
-                    className={cn(
-                      "glass-card p-4 cursor-pointer transition-all duration-300 hover:border-primary/30 glow-effect",
-                      selectedResult === result.id && "border-primary/30 shadow-lg shadow-primary/10"
-                    )}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={cn(
-                        "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-                        TYPE_COLORS[resultType] || "bg-primary/20 text-primary"
-                      )}>
-                        <IconComponent className="w-5 h-5" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={cn(
-                            "text-xs font-medium px-2 py-0.5 rounded-full",
-                            TYPE_COLORS[resultType] || "bg-primary/20 text-primary"
-                          )}>
-                            {resultType}
-                          </span>
-                          <span className="text-xs text-muted-foreground">{resultSource}</span>
-                          <span className="text-xs text-muted-foreground ml-auto">{resultDate}</span>
-                        </div>
-                        <h3 className="font-medium text-foreground mb-1 truncate">{resultTitle}</h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{result.snippet}</p>
-                      </div>
-
-                      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0 mt-2" />
-                    </div>
-                  </motion.div>
-                );
-              })
-            ) : hasSyncedData ? (
+            {hasSyncedData ? (
               // Show memory signals when synced - AI-generated memory abstractions
               isLoadingMemories ? (
                 <div className="text-center py-8">

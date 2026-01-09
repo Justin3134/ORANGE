@@ -499,18 +499,6 @@ const Settings = () => {
             "rounded-2xl border divide-y backdrop-blur-xl",
             darkMode ? "bg-white/5 border-white/10 divide-white/10" : "glass-card divide-border/50"
           )}>
-            {/* Dark Mode */}
-            <div className="flex items-center gap-4 p-4">
-              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", darkMode ? "bg-yellow-500/10 text-yellow-500" : "bg-secondary text-muted-foreground")}>
-                {darkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              </div>
-              <div className="flex-1">
-                <p className={cn("font-medium", darkMode ? "text-white" : "text-foreground")}>Dark Mode</p>
-                <p className={cn("text-sm", darkMode ? "text-white/60" : "text-muted-foreground")}>Use dark theme</p>
-              </div>
-              <Switch checked={darkMode} onCheckedChange={handleDarkModeToggle} />
-            </div>
-
             {/* Auto Sync */}
             <div className="flex items-center gap-4 p-4">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-secondary text-muted-foreground">
@@ -643,36 +631,7 @@ const Settings = () => {
           </div>
         </motion.div>
 
-        {/* Danger Zone */}
-        {connectedServices.includes('gmail') && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className={cn(
-              "rounded-2xl p-6 border",
-              darkMode ? "bg-red-500/5 border-red-500/20" : "bg-destructive/5 border-destructive/20"
-            )}
-          >
-            <h3 className="font-semibold text-destructive mb-2">Danger Zone</h3>
-            <p className={cn("text-sm mb-4", darkMode ? "text-white/60" : "text-muted-foreground")}>
-              Disconnect your Google account. This will remove access to your Gmail and delete all synced data.
-            </p>
-            <Button
-              variant="outline"
-              className="text-destructive border-destructive/50 hover:bg-destructive/10"
-              onClick={() => handleDisconnect('gmail')}
-              disabled={isDisconnecting}
-            >
-              {isDisconnecting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <XCircle className="w-4 h-4 mr-2" />
-              )}
-              Disconnect Google Account
-            </Button>
-          </motion.div>
-        )}
+        {/* Danger Zone removed - redundant with Sign Out button */}
 
         {/* Version */}
         <motion.p

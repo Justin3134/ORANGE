@@ -110,8 +110,7 @@ export const MOCK_SEARCH_RESULTS = [
 
 // Dashboard items
 export const SIDEBAR_ITEMS = [
-    { icon: Home, label: "Home", path: "/dashboard" },
-    { icon: Search, label: "Search", path: "/dashboard" },
+    { icon: MessageSquare, label: "Memory", path: "/dashboard" },
     { icon: MessageSquare, label: "Chat", path: "/chat" },
     { icon: RefreshCw, label: "Sync", path: "/sync" },
     { icon: Settings, label: "Settings", path: "/settings" },

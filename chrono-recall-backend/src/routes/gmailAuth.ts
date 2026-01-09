@@ -574,7 +574,7 @@ async function getOrCreateLabel(gmail: any, labelName: string): Promise<string> 
  * POST /api/label-emails
  */
 export const labelEmails = async (req: Request, res: Response) => {
-  const { userId, labelName, emailIds } = req.body;
+  const { userId, labelName, emailIds, allGmailEmails } = req.body;
 
   if (!userId) {
     return res.status(400).json({ error: 'userId is required' });
@@ -584,8 +584,23 @@ export const labelEmails = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'labelName is required' });
   }
 
-  if (!emailIds || !Array.isArray(emailIds) || emailIds.length === 0) {
-    return res.status(400).json({ error: 'emailIds array is required' });
+  // Support both old format (array of strings) and new format (array of objects with accountEmail)
+  let emailData: Array<{ id: string; accountEmail?: string; accountIndex?: number }> = [];
+  
+  if (allGmailEmails && Array.isArray(allGmailEmails)) {
+    // New format: array of objects with id and accountEmail
+    emailData = allGmailEmails;
+  } else if (emailIds && Array.isArray(emailIds)) {
+    // Old format: array of strings, convert to objects
+    emailData = emailIds.map((id: any) => 
+      typeof id === 'string' ? { id } : id
+    );
+  } else {
+    return res.status(400).json({ error: 'emailIds or allGmailEmails array is required' });
+  }
+
+  if (emailData.length === 0) {
+    return res.status(400).json({ error: 'No emails to label' });
   }
 
   // Get all accounts for the user
@@ -597,78 +612,143 @@ export const labelEmails = async (req: Request, res: Response) => {
     });
   }
 
-  // Group emailIds by accountEmail if provided, otherwise use first account
-  // For now, we'll label in all accounts (or we could require accountEmail per email)
-  // Let's use the first account for backward compatibility, but we can enhance this later
-  const firstAccount = accountClients[0];
-  
-  try {
-    const gmail = google.gmail({ version: 'v1', auth: firstAccount.client });
+  // Group emails by accountEmail
+  const emailsByAccount = new Map<string, string[]>();
+  const emailsWithoutAccount: string[] = [];
 
-    // Get or create the label
-    const labelId = await getOrCreateLabel(gmail, labelName);
-    console.log(`📋 Using label "${labelName}" (ID: ${labelId})`);
+  for (const emailDataItem of emailData) {
+    const emailId = emailDataItem.id;
+    const accountEmail = emailDataItem.accountEmail;
+    
+    if (accountEmail) {
+      if (!emailsByAccount.has(accountEmail)) {
+        emailsByAccount.set(accountEmail, []);
+      }
+      emailsByAccount.get(accountEmail)!.push(emailId);
+    } else {
+      emailsWithoutAccount.push(emailId);
+    }
+  }
 
-    // Apply label to all emails in batches (Gmail API limit is 1000 per request)
-    const batchSize = 1000;
-    const results = {
-      success: 0,
-      failed: 0,
-      errors: [] as string[]
-    };
+  // Create a map of accountEmail to accountClient for quick lookup
+  const accountClientMap = new Map<string, any>();
+  accountClients.forEach(({ email, client }) => {
+    accountClientMap.set(email.toLowerCase(), client);
+  });
 
-    for (let i = 0; i < emailIds.length; i += batchSize) {
-      const batch = emailIds.slice(i, i + batchSize);
-      
-      try {
-        // Use batch modify for efficiency
-        await gmail.users.messages.batchModify({
-          userId: 'me',
-          requestBody: {
-            ids: batch,
-            addLabelIds: [labelId]
-          }
-        });
-        results.success += batch.length;
-      } catch (err: any) {
-        console.error(`Error labeling batch:`, err);
-        // Fallback to individual labeling
-        for (const emailId of batch) {
-          try {
-            await gmail.users.messages.modify({
-              userId: 'me',
-              id: emailId,
-              requestBody: {
-                addLabelIds: [labelId]
-              }
-            });
-            results.success++;
-          } catch (individualErr: any) {
-            results.failed++;
-            results.errors.push(`Email ${emailId}: ${individualErr.message}`);
+  const results = {
+    success: 0,
+    failed: 0,
+    errors: [] as string[],
+    byAccount: {} as Record<string, { success: number; failed: number }>
+  };
+
+  // Label emails in each account
+  for (const [accountEmail, emailIdsForAccount] of emailsByAccount.entries()) {
+    const accountClient = accountClientMap.get(accountEmail.toLowerCase());
+    if (!accountClient) {
+      console.warn(`⚠️ Account client not found for ${accountEmail}, skipping ${emailIdsForAccount.length} emails`);
+      results.failed += emailIdsForAccount.length;
+      results.errors.push(`Account ${accountEmail}: Client not found`);
+      continue;
+    }
+
+    try {
+      const gmail = google.gmail({ version: 'v1', auth: accountClient });
+      const labelId = await getOrCreateLabel(gmail, labelName);
+      console.log(`📋 Using label "${labelName}" (ID: ${labelId}) in account ${accountEmail}`);
+
+      const batchSize = 1000;
+      let accountSuccess = 0;
+      let accountFailed = 0;
+
+      for (let i = 0; i < emailIdsForAccount.length; i += batchSize) {
+        const batch = emailIdsForAccount.slice(i, i + batchSize);
+        
+        try {
+          await gmail.users.messages.batchModify({
+            userId: 'me',
+            requestBody: {
+              ids: batch,
+              addLabelIds: [labelId]
+            }
+          });
+          accountSuccess += batch.length;
+        } catch (err: any) {
+          console.error(`Error labeling batch in ${accountEmail}:`, err);
+          // Fallback to individual labeling
+          for (const emailId of batch) {
+            try {
+              await gmail.users.messages.modify({
+                userId: 'me',
+                id: emailId,
+                requestBody: {
+                  addLabelIds: [labelId]
+                }
+              });
+              accountSuccess++;
+            } catch (individualErr: any) {
+              accountFailed++;
+              results.errors.push(`Email ${emailId} in ${accountEmail}: ${individualErr.message}`);
+            }
           }
         }
       }
+
+      results.success += accountSuccess;
+      results.failed += accountFailed;
+      results.byAccount[accountEmail] = { success: accountSuccess, failed: accountFailed };
+      console.log(`✅ Labeled ${accountSuccess} emails with "${labelName}" in account ${accountEmail}`);
+    } catch (err: any) {
+      console.error(`Error labeling emails in account ${accountEmail}:`, err);
+      results.failed += emailIdsForAccount.length;
+      results.errors.push(`Account ${accountEmail}: ${err.message}`);
     }
-
-    console.log(`✅ Labeled ${results.success} emails with "${labelName}"`);
-
-    res.json({
-      success: true,
-      labelName,
-      labelId,
-      results: {
-        total: emailIds.length,
-        success: results.success,
-        failed: results.failed
-      },
-      errors: results.errors.length > 0 ? results.errors : undefined
-    });
-  } catch (err: any) {
-    console.error('Error labeling emails:', err);
-    res.status(500).json({ 
-      error: 'Failed to label emails',
-      message: err.message 
-    });
   }
+
+  // Handle emails without accountEmail (fallback to first account for backward compatibility)
+  if (emailsWithoutAccount.length > 0 && accountClients.length > 0) {
+    console.warn(`⚠️ Labeling ${emailsWithoutAccount.length} emails without accountEmail in first account`);
+    const firstAccount = accountClients[0];
+    try {
+      const gmail = google.gmail({ version: 'v1', auth: firstAccount.client });
+      const labelId = await getOrCreateLabel(gmail, labelName);
+
+      const batchSize = 1000;
+      for (let i = 0; i < emailsWithoutAccount.length; i += batchSize) {
+        const batch = emailsWithoutAccount.slice(i, i + batchSize);
+        try {
+          await gmail.users.messages.batchModify({
+            userId: 'me',
+            requestBody: {
+              ids: batch,
+              addLabelIds: [labelId]
+            }
+          });
+          results.success += batch.length;
+        } catch (err: any) {
+          results.failed += batch.length;
+          results.errors.push(`Batch in fallback account: ${err.message}`);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error labeling emails in fallback account:', err);
+      results.failed += emailsWithoutAccount.length;
+      results.errors.push(`Fallback account: ${err.message}`);
+    }
+  }
+
+  console.log(`✅ Labeled ${results.success}/${emailData.length} emails with "${labelName}"`);
+
+  res.json({
+    success: true,
+    labelName,
+    results: {
+      total: emailData.length,
+      success: results.success,
+      failed: results.failed
+    },
+    byAccount: Object.keys(results.byAccount).length > 0 ? results.byAccount : undefined,
+    errors: results.errors.length > 0 ? results.errors : undefined
+  });
 };

@@ -31,7 +31,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
-import { sendChatMessage, getUserStatus, connectGmail, connectDiscord, connectSlack, labelEmails } from "@/lib/api";
+import { sendChatMessage, getUserStatus, connectGmail, connectDiscord, connectSlack, labelEmails, getGmailStatus } from "@/lib/api";
 import { useUser } from "@/contexts/UserContext";
 
 interface Message {
@@ -59,6 +59,7 @@ interface ChatResponse {
   };
   totalGmailCount?: number;
   allGmailIds?: string[];
+  allGmailEmails?: Array<{ id: string; accountEmail?: string; accountIndex?: number }>;
   hasRelevantSources?: boolean;
 }
 
@@ -90,7 +91,9 @@ const Chat = () => {
   const [isLabeling, setIsLabeling] = useState(false);
   const [lastSearchQuery, setLastSearchQuery] = useState("");
   const [lastGmailIds, setLastGmailIds] = useState<string[]>([]);
+  const [lastGmailEmails, setLastGmailEmails] = useState<Array<{ id: string; accountEmail?: string; accountIndex?: number }>>([]);
   const [lastTotalGmail, setLastTotalGmail] = useState(0);
+  const [gmailAccounts, setGmailAccounts] = useState<Array<{ email: string; name: string; connectedAt: string }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -102,12 +105,51 @@ const Chat = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('chat_history');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setMessages(parsed.messages || []);
+        setConversations(parsed.conversations || []);
+      }
+    } catch (e) {
+      console.error('Failed to load chat history:', e);
+    }
+  }, []);
+
+  // Save chat history to localStorage whenever messages or conversations change
+  useEffect(() => {
+    if (messages.length > 0 || conversations.length > 0) {
+      try {
+        localStorage.setItem('chat_history', JSON.stringify({
+          messages,
+          conversations
+        }));
+      } catch (e) {
+        console.error('Failed to save chat history:', e);
+      }
+    }
+  }, [messages, conversations]);
+
   // Check user status on mount
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const status = await getUserStatus(userId);
         setConnectedServices(status.connectedServices || []);
+        
+        // Load Gmail accounts if Gmail is connected
+        if (status.connectedServices?.includes('gmail')) {
+          try {
+            const { getGmailStatus } = await import('@/lib/api');
+            const gmailStatus = await getGmailStatus(userId);
+            setGmailAccounts(gmailStatus.accounts || []);
+          } catch (err) {
+            console.error("Failed to load Gmail accounts:", err);
+          }
+        }
       } catch (err) {
         console.error("Failed to get user status:", err);
       }
@@ -119,6 +161,8 @@ const Chat = () => {
     if (urlParams.get('gmail_connected') === 'true') {
       setConnectedServices(prev => [...new Set([...prev, 'gmail'])]);
       window.history.replaceState({}, document.title, window.location.pathname);
+      // Refresh status after OAuth
+      setTimeout(() => checkStatus(), 500);
     }
     if (urlParams.get('discord_connected') === 'true') {
       setConnectedServices(prev => [...new Set([...prev, 'discord'])]);
@@ -128,7 +172,7 @@ const Chat = () => {
       setConnectedServices(prev => [...new Set([...prev, 'slack'])]);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, []);
+  }, [userId]);
 
   // Auto-send if there's a query parameter
   useEffect(() => {
@@ -189,27 +233,34 @@ const Chat = () => {
       // Check both new fields and fallback to searchResults if needed
       const gmailCount = response.totalGmailCount || response.searchResults?.gmail?.length || 0;
       const gmailIds = response.allGmailIds || response.searchResults?.gmail?.map((m: any) => m.id) || [];
+      const gmailEmails = response.allGmailEmails || response.searchResults?.gmail?.map((m: any) => ({ 
+        id: m.id, 
+        accountEmail: m.accountEmail, 
+        accountIndex: m.accountIndex 
+      })) || [];
       
-      if (selectedPlatforms.includes('gmail') && gmailCount > 5 && gmailIds.length > 5) {
+      if (selectedPlatforms.includes('gmail') && gmailCount > 5 && gmailEmails.length > 5) {
         console.log('✅ Setting label state:', {
           totalGmailCount: gmailCount,
-          allGmailIdsLength: gmailIds.length,
+          allGmailEmailsLength: gmailEmails.length,
           searchQuery: messageText
         });
         setLastSearchQuery(messageText);
         setLastGmailIds(gmailIds);
+        setLastGmailEmails(gmailEmails);
         setLastTotalGmail(gmailCount);
       } else {
         console.log('❌ Clearing label state:', {
           hasGmail: selectedPlatforms.includes('gmail'),
           totalGmailCount: gmailCount,
-          allGmailIdsLength: gmailIds.length,
+          allGmailEmailsLength: gmailEmails.length,
           reason: !selectedPlatforms.includes('gmail') ? 'Gmail not selected' : 
                   gmailCount <= 5 ? 'Count <= 5' : 
-                  gmailIds.length <= 5 ? 'IDs length <= 5' : 'Unknown'
+                  gmailEmails.length <= 5 ? 'Emails length <= 5' : 'Unknown'
         });
         // Clear if 5 or fewer results
         setLastGmailIds([]);
+        setLastGmailEmails([]);
         setLastTotalGmail(0);
       }
 
@@ -244,7 +295,7 @@ const Chat = () => {
 
   // Handle labeling emails
   const handleLabelEmails = async () => {
-    if (lastGmailIds.length === 0) return;
+    if (lastGmailEmails.length === 0 && lastGmailIds.length === 0) return;
 
     setIsLabeling(true);
     try {
@@ -253,13 +304,22 @@ const Chat = () => {
         ? lastSearchQuery.substring(0, 27) + "..."
         : lastSearchQuery;
       
-      const result = await labelEmails(userId, labelName, lastGmailIds);
+      // Use new format with allGmailEmails if available, otherwise fallback to old format
+      const result: any = await labelEmails(userId, labelName, lastGmailIds, lastGmailEmails.length > 0 ? lastGmailEmails : undefined);
       
-      // Show success message
+      // Show success message with account breakdown if available
+      let message = `✅ Successfully labeled ${result.results?.success || 0} email(s) with "${labelName}" in Gmail!`;
+      if (result.byAccount) {
+        const accountDetails = Object.entries(result.byAccount)
+          .map(([email, stats]: [string, any]) => `${stats.success} in ${email}`)
+          .join(', ');
+        message += ` (${accountDetails})`;
+      }
+      
       setMessages(prev => [...prev, {
         id: Date.now(),
         role: "assistant",
-        content: `✅ Successfully labeled ${result.results.success} email(s) with "${labelName}" in Gmail! You can now see all ${result.results.total} emails in your Gmail labels.`,
+        content: message,
         timestamp: new Date()
       }]);
     } catch (error: any) {
@@ -638,8 +698,40 @@ const Chat = () => {
         {/* Input Area */}
         <div className="border-t border-border/50 bg-background p-4">
           <div className="max-w-3xl mx-auto">
+            {/* Connected Accounts Display */}
+            {connectedServices.length > 0 && (
+              <div className="mb-3 flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">Searching in:</span>
+                {connectedServices.includes('gmail') && gmailAccounts.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {gmailAccounts.map((account, idx) => (
+                      <div
+                        key={account.email}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs"
+                      >
+                        <Mail className="w-3 h-3" />
+                        <span className="truncate max-w-[150px]">{account.email}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {connectedServices.includes('discord') && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-500 text-xs">
+                    <MessageSquare className="w-3 h-3" />
+                    <span>Discord</span>
+                  </div>
+                )}
+                {connectedServices.includes('slack') && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-500 text-xs">
+                    <Hash className="w-3 h-3" />
+                    <span>Slack</span>
+                  </div>
+                )}
+              </div>
+            )}
+            
             {/* Label Button - Show when there are more than 5 Gmail results */}
-            {lastTotalGmail > 5 && lastGmailIds.length > 0 && (
+            {lastTotalGmail > 5 && (lastGmailEmails.length > 5 || lastGmailIds.length > 5) && (
               <div className="mb-3 flex items-center justify-end">
                 <Button
                   onClick={handleLabelEmails}

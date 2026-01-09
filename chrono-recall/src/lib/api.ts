@@ -277,14 +277,15 @@ export async function disconnectService(userId: string = DEFAULT_USER_ID, servic
 export async function labelEmails(
   userId: string = DEFAULT_USER_ID,
   labelName: string,
-  emailIds: string[]
+  emailIds: string[],
+  allGmailEmails?: Array<{ id: string; accountEmail?: string; accountIndex?: number }>
 ) {
   const res = await fetch(`${BACKEND_URL}/api/label-emails`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ userId, labelName, emailIds }),
+    body: JSON.stringify({ userId, labelName, emailIds, allGmailEmails }),
   });
 
   if (!res.ok) {

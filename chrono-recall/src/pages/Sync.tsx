@@ -19,7 +19,7 @@ const PLATFORMS = [
 ];
 
 const Sync = () => {
-  const { user } = useUser();
+  const { user, isLoading: userLoading } = useUser();
   const userId = user?.id || 'guest';
 
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
@@ -46,11 +46,24 @@ const Sync = () => {
     return date.toLocaleDateString();
   };
 
-  // Load user status on mount
+  // Load user status on mount - wait for UserContext to finish loading
   useEffect(() => {
+    // Don't load status until UserContext has finished loading
+    if (userLoading) {
+      return;
+    }
+
+    // Don't load if user is not authenticated
+    if (!user || userId === 'guest') {
+      setIsLoading(false);
+      return;
+    }
+
     const loadStatus = async () => {
       try {
+        console.log(`📡 Sync: Loading status for userId: ${userId}`);
         const status = await getUserStatus(userId);
+        console.log(`✅ Sync: Status loaded:`, { connectedServices: status.connectedServices, gmailAccounts: status.gmailAccounts?.length });
         setConnectedPlatforms(status.connectedServices || []);
         setMemoriesCount(status.memoriesCount || 0);
         
@@ -59,6 +72,7 @@ const Sync = () => {
           try {
             const gmailStatus = await getGmailStatus(userId);
             setGmailAccounts(gmailStatus.accounts || []);
+            console.log(`✅ Sync: Loaded ${gmailStatus.accounts?.length || 0} Gmail account(s)`);
           } catch (err) {
             console.error("Failed to load Gmail status:", err);
           }
@@ -118,7 +132,7 @@ const Sync = () => {
       setConnectedPlatforms(prev => [...new Set([...prev, 'slack'])]);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, []);
+  }, [userId, user, userLoading]);
 
   const handleConnect = async (platformId: string) => {
     if (platformId === 'gmail') {
