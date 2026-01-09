@@ -16,7 +16,8 @@ import { useUser } from "@/contexts/UserContext";
 import { toast } from "sonner";
 
 const Dashboard = () => {
-  const { user, login, isAuthenticated } = useUser();
+  const { user, login } = useUser();
+  const isAuthenticated = !!user;
   const userId = user?.id || 'guest';
 
   const [searchQuery, setSearchQuery] = useState("");
