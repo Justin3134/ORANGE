@@ -414,21 +414,38 @@ const Settings = () => {
                                   max="10"
                                   value={indexValue}
                                   onChange={(e) => setIndexValue(parseInt(e.target.value) || 0)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleUpdateIndex(emailId, account.email);
+                                    } else if (e.key === 'Escape') {
+                                      setEditingIndex(null);
+                                    }
+                                  }}
                                   className="w-16 h-7 text-xs"
+                                  autoFocus
                                 />
                                 <Button
+                                  type="button"
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 px-2"
-                                  onClick={() => handleUpdateIndex(emailId, account.email)}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleUpdateIndex(emailId, account.email);
+                                  }}
                                 >
                                   <Check className="w-3 h-3" />
                                 </Button>
                                 <Button
+                                  type="button"
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 px-2"
-                                  onClick={() => setEditingIndex(null)}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setEditingIndex(null);
+                                  }}
                                 >
                                   <X className="w-3 h-3" />
                                 </Button>
@@ -442,6 +459,7 @@ const Settings = () => {
                                   u/{account.gmailAccountIndex ?? '?'}
                                 </span>
                                 <button
+                                  type="button"
                                   onClick={() => {
                                     setEditingIndex(emailId);
                                     setIndexValue(account.gmailAccountIndex ?? 0);
