@@ -224,7 +224,11 @@ const Sync = () => {
   };
 
   // Handle update Gmail account index
-  const handleUpdateIndex = async (emailId: string, email: string) => {
+  const handleUpdateIndex = async (emailId: string, email: string, e?: React.MouseEvent | React.KeyboardEvent | React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     try {
       await updateGmailAccountIndex(userId, emailId, indexValue);
       // Reload Gmail accounts
@@ -233,6 +237,7 @@ const Sync = () => {
       setEditingIndex(null);
     } catch (err: any) {
       console.error("Failed to update index:", err);
+      // Show error but don't navigate - keep editing state so user can retry
       alert(err.message || "Failed to update Gmail account index");
     }
   };
@@ -468,7 +473,7 @@ const Sync = () => {
 
                       {/* Gmail Accounts List - Only show for Gmail when connected */}
                       {isGmail && isConnected && gmailAccounts.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
+                        <div className="mt-4 pt-4 border-t border-border/50 space-y-2 overflow-visible">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                             Connected Accounts ({gmailAccounts.length})
                           </p>
@@ -478,7 +483,7 @@ const Sync = () => {
                             return (
                               <div
                                 key={emailId}
-                                className="flex items-center justify-between p-2 rounded-lg bg-secondary/30 border border-border/30"
+                                className="flex items-center justify-between p-2 rounded-lg bg-secondary/30 border border-border/30 relative overflow-visible"
                               >
                                 <div className="flex-1 min-w-0">
                                   <p className="text-xs font-medium truncate">{account.name || account.email}</p>
@@ -489,7 +494,15 @@ const Sync = () => {
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-muted-foreground">Index:</span>
                                     {isEditing ? (
-                                      <div className="flex items-center gap-1">
+                                      <form
+                                        onSubmit={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handleUpdateIndex(emailId, account.email, e);
+                                        }}
+                                        className="flex items-center gap-1"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
                                         <Input
                                           type="number"
                                           min="0"
@@ -499,8 +512,10 @@ const Sync = () => {
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                               e.preventDefault();
-                                              handleUpdateIndex(emailId, account.email);
+                                              e.stopPropagation();
+                                              handleUpdateIndex(emailId, account.email, e);
                                             } else if (e.key === 'Escape') {
+                                              e.preventDefault();
                                               setEditingIndex(null);
                                             }
                                           }}
@@ -508,14 +523,10 @@ const Sync = () => {
                                           autoFocus
                                         />
                                         <Button
-                                          type="button"
+                                          type="submit"
                                           size="sm"
                                           variant="ghost"
                                           className="h-6 px-1.5"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            handleUpdateIndex(emailId, account.email);
-                                          }}
                                         >
                                           <Check className="w-3 h-3" />
                                         </Button>
@@ -526,12 +537,13 @@ const Sync = () => {
                                           className="h-6 px-1.5"
                                           onClick={(e) => {
                                             e.preventDefault();
+                                            e.stopPropagation();
                                             setEditingIndex(null);
                                           }}
                                         >
                                           <X className="w-3 h-3" />
                                         </Button>
-                                      </div>
+                                      </form>
                                     ) : (
                                       <div className="flex items-center gap-1">
                                         <span className="px-1.5 py-0.5 rounded text-xs font-mono bg-background text-foreground border border-border">
@@ -548,9 +560,9 @@ const Sync = () => {
                                           Edit
                                         </button>
                                         {/* Info icon with tooltip */}
-                                        <div className="relative group">
+                                        <div className="relative group" style={{ zIndex: 100 }}>
                                           <Info className="w-3 h-3 cursor-help text-muted-foreground" />
-                                          <div className="absolute bottom-full right-0 mb-2 w-72 p-3 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none bg-popover border border-border">
+                                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-[100] pointer-events-none bg-popover border border-border">
                                             <p className="text-xs leading-relaxed text-foreground">
                                               <strong>Gmail Account Index:</strong><br />
                                               Open Gmail and make sure you're viewing this email account. Then look at the number in the address bar (u/0, u/1, etc.) and enter it here. This helps Recall Jump open emails in the correct Gmail account.

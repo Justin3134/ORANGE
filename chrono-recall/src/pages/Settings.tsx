@@ -226,7 +226,11 @@ const Settings = () => {
   };
 
   // Handle update Gmail account index
-  const handleUpdateIndex = async (emailId: string, email: string) => {
+  const handleUpdateIndex = async (emailId: string, email: string, e?: React.MouseEvent | React.KeyboardEvent | React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     try {
       await updateGmailAccountIndex(userId, emailId, indexValue);
       // Reload Gmail accounts
@@ -235,6 +239,7 @@ const Settings = () => {
       setEditingIndex(null);
     } catch (err: any) {
       console.error("Failed to update index:", err);
+      // Show error but don't navigate - keep editing state so user can retry
       alert(err.message || "Failed to update Gmail account index");
     }
   };
@@ -385,7 +390,7 @@ const Settings = () => {
                       <div
                         key={emailId}
                         className={cn(
-                          "flex items-center justify-between p-3 rounded-lg border",
+                          "flex items-center justify-between p-3 rounded-lg border relative overflow-visible",
                           darkMode ? "bg-white/5 border-white/10" : "bg-secondary/50 border-border/50"
                         )}
                       >
@@ -407,7 +412,15 @@ const Settings = () => {
                               Index:
                             </span>
                             {isEditing ? (
-                              <div className="flex items-center gap-1">
+                              <form
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleUpdateIndex(emailId, account.email, e);
+                                }}
+                                className="flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <Input
                                   type="number"
                                   min="0"
@@ -417,8 +430,10 @@ const Settings = () => {
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                       e.preventDefault();
-                                      handleUpdateIndex(emailId, account.email);
+                                      e.stopPropagation();
+                                      handleUpdateIndex(emailId, account.email, e);
                                     } else if (e.key === 'Escape') {
+                                      e.preventDefault();
                                       setEditingIndex(null);
                                     }
                                   }}
@@ -426,14 +441,10 @@ const Settings = () => {
                                   autoFocus
                                 />
                                 <Button
-                                  type="button"
+                                  type="submit"
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 px-2"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleUpdateIndex(emailId, account.email);
-                                  }}
                                 >
                                   <Check className="w-3 h-3" />
                                 </Button>
@@ -444,12 +455,13 @@ const Settings = () => {
                                   className="h-7 px-2"
                                   onClick={(e) => {
                                     e.preventDefault();
+                                    e.stopPropagation();
                                     setEditingIndex(null);
                                   }}
                                 >
                                   <X className="w-3 h-3" />
                                 </Button>
-                              </div>
+                              </form>
                             ) : (
                               <div className="flex items-center gap-1">
                                 <span className={cn(
@@ -472,13 +484,13 @@ const Settings = () => {
                                   Edit
                                 </button>
                                 {/* Info icon with tooltip */}
-                                <div className="relative group">
+                                <div className="relative group" style={{ zIndex: 100 }}>
                                   <Info className={cn(
                                     "w-3.5 h-3.5 cursor-help",
                                     darkMode ? "text-white/40" : "text-muted-foreground"
                                   )} />
                                   <div className={cn(
-                                    "absolute bottom-full right-0 mb-2 w-72 p-3 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none",
+                                    "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-[100] pointer-events-none",
                                     darkMode ? "bg-black/90 border border-white/20" : "bg-popover border border-border"
                                   )}>
                                     <p className={cn("text-xs leading-relaxed", darkMode ? "text-white" : "text-foreground")}>
