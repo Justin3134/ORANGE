@@ -220,18 +220,26 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
     const userName = userInfo.data.name || userInfo.data.given_name || '';
 
     const emailId = userEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    
+    // If userId was 'guest', generate userId from email instead
+    // This ensures accounts are stored under the correct userId from the start
+    let actualUserId = finalUserId;
+    if (finalUserId === 'guest' || !finalUserId) {
+      actualUserId = emailId; // Use email-based userId for guest users
+      console.log(`🔄 Converting guest userId to email-based userId: ${actualUserId}`);
+    }
 
     // Get or create user's account map
-    let userAccounts = tokenStore.get(finalUserId);
+    let userAccounts = tokenStore.get(actualUserId);
     if (!userAccounts) {
       userAccounts = new Map();
-      tokenStore.set(finalUserId, userAccounts);
+      tokenStore.set(actualUserId, userAccounts);
     }
 
     // Check if this email is already connected
     const existingAccount = userAccounts.get(emailId);
     if (existingAccount) {
-      console.log(`🔄 Updating existing Gmail account for user ${finalUserId}: ${userEmail}`);
+      console.log(`🔄 Updating existing Gmail account for user ${actualUserId}: ${userEmail}`);
       // Update tokens but keep original connectedAt
       userAccounts.set(emailId, {
         tokens,
@@ -240,7 +248,7 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
         connectedAt: existingAccount.connectedAt
       });
     } else {
-      console.log(`➕ Adding new Gmail account for user ${finalUserId}: ${userEmail}`);
+      console.log(`➕ Adding new Gmail account for user ${actualUserId}: ${userEmail}`);
       // Add new account
       userAccounts.set(emailId, {
         tokens,
@@ -250,26 +258,27 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
       });
     }
     
-    // Ensure the store is updated
-    tokenStore.set(finalUserId, userAccounts);
+    // Ensure the store is updated with actualUserId
+    tokenStore.set(actualUserId, userAccounts);
     
     // Persist to file immediately
     saveTokens(tokenStore);
 
     const accountCount = userAccounts.size;
     const totalAccounts = Array.from(tokenStore.values()).reduce((sum, accounts) => sum + accounts.size, 0);
-    console.log(`✅ Gmail connected for user ${finalUserId} (${userEmail}). Total accounts: ${accountCount}`);
+    console.log(`✅ Gmail connected for user ${actualUserId} (${userEmail}). Total accounts: ${accountCount}`);
     console.log(`📋 Token store status: ${tokenStore.size} user(s), ${totalAccounts} total account(s)`);
     console.log(`💾 Token file location: ${TOKEN_FILE}`);
-    console.log(`📋 Token store status: ${tokenStore.size} user(s), ${Array.from(tokenStore.values()).reduce((sum, accounts) => sum + accounts.size, 0)} total account(s)`);
 
     // Redirect back to frontend with success and user info
+    // Use actualUserId (which might be email-based if original was 'guest')
     const redirectUrl = new URL(`${config.frontendUrl}/dashboard`);
     redirectUrl.searchParams.set('gmail_connected', 'true');
     redirectUrl.searchParams.set('gmail_account_added', addAccount ? 'true' : 'false');
     redirectUrl.searchParams.set('email', userEmail);
     redirectUrl.searchParams.set('name', userName);
     redirectUrl.searchParams.set('account_count', accountCount.toString());
+    redirectUrl.searchParams.set('userId', actualUserId); // Use actualUserId (email-based if was guest)
 
     res.redirect(redirectUrl.toString());
   } catch (err: any) {

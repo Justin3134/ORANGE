@@ -71,14 +71,35 @@ const Sync = () => {
     };
     loadStatus();
 
-    // Check for OAuth callback
+    // Check for OAuth callback and refresh status
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('gmail_connected') === 'true') {
-      setConnectedPlatforms(prev => [...new Set([...prev, 'gmail'])]);
-      // Reload Gmail accounts after connection
-      getGmailStatus(userId).then(status => {
-        setGmailAccounts(status.accounts || []);
-      }).catch(err => console.error("Failed to load Gmail status:", err));
+    const gmailConnected = urlParams.get('gmail_connected') === 'true';
+    const gmailAccountAdded = urlParams.get('gmail_account_added') === 'true';
+    const callbackUserId = urlParams.get('userId'); // Get userId from redirect
+    
+    if (gmailConnected || gmailAccountAdded) {
+      // Refresh all status after OAuth callback
+      const refreshAfterOAuth = async () => {
+        const currentUserId = callbackUserId || userId;
+        try {
+          const status = await getUserStatus(currentUserId);
+          setConnectedPlatforms(status.connectedServices || []);
+          
+          // Load Gmail accounts if Gmail is connected
+          if (status.connectedServices?.includes('gmail')) {
+            try {
+              const gmailStatus = await getGmailStatus(currentUserId);
+              setGmailAccounts(gmailStatus.accounts || []);
+            } catch (err) {
+              console.error("Failed to load Gmail status:", err);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to refresh status after OAuth:", err);
+        }
+      };
+      
+      refreshAfterOAuth();
       window.history.replaceState({}, document.title, window.location.pathname);
     }
     if (urlParams.get('discord_connected') === 'true') {

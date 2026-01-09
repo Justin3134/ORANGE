@@ -58,19 +58,25 @@ const Landing = () => {
       }
     };
 
-    // Check for OAuth callback
+    // Check for OAuth callback - if we get redirected back from OAuth, redirect to dashboard
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('gmail_connected') === 'true') {
-      setConnectedServices(prev => [...new Set([...prev, 'gmail'])]);
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-    if (urlParams.get('discord_connected') === 'true') {
-      setConnectedServices(prev => [...new Set([...prev, 'discord'])]);
-      window.history.replaceState({}, document.title, window.location.pathname);
+    const gmailConnected = urlParams.get('gmail_connected') === 'true';
+    const discordConnected = urlParams.get('discord_connected') === 'true';
+    const slackConnected = urlParams.get('slack_connected') === 'true';
+    const email = urlParams.get('email');
+    const callbackUserId = urlParams.get('userId');
+    
+    if (gmailConnected || discordConnected || slackConnected) {
+      // If OAuth completed, redirect to dashboard for proper handling
+      // Dashboard will handle the login and status refresh
+      if (email || callbackUserId) {
+        navigate('/dashboard?' + urlParams.toString());
+        return;
+      }
     }
 
     checkStatus();
-  }, [isAuthenticated, userId]);
+  }, [isAuthenticated, userId, navigate]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,14 +101,20 @@ const Landing = () => {
   };
 
   const handleConnect = (platformId: string) => {
-    // Start OAuth directly - this IS the login
     setIsConnecting(true);
+    
+    // Generate userId from email if user is authenticated, otherwise use 'guest'
+    // Note: When OAuth completes, the backend will use the actual email from Google
+    // to store accounts. The Dashboard OAuth handler will then login the user with
+    // that email, generating the correct userId.
+    const connectUserId = isAuthenticated && user ? userId : 'guest';
+    
     if (platformId === 'gmail') {
-      connectGmail('new_user');
+      connectGmail(connectUserId, false);
     } else if (platformId === 'discord') {
-      connectDiscord('new_user');
+      connectDiscord(connectUserId);
     } else if (platformId === 'slack') {
-      connectSlack('new_user');
+      connectSlack(connectUserId);
     }
   };
 

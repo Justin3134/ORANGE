@@ -103,6 +103,33 @@ const Settings = () => {
     };
     loadStatus();
 
+    // Check for OAuth callback and refresh Gmail accounts
+    const urlParams = new URLSearchParams(window.location.search);
+    const gmailConnected = urlParams.get('gmail_connected') === 'true';
+    const gmailAccountAdded = urlParams.get('gmail_account_added') === 'true';
+    const callbackUserId = urlParams.get('userId');
+    
+    if (gmailConnected || gmailAccountAdded) {
+      // Refresh Gmail accounts after OAuth callback
+      const refreshAfterOAuth = async () => {
+        const currentUserId = callbackUserId || userId;
+        try {
+          const status = await getUserStatus(currentUserId);
+          setConnectedServices(status.connectedServices || []);
+          
+          if (status.connectedServices?.includes('gmail')) {
+            const gmailStatus = await getGmailStatus(currentUserId);
+            setGmailAccounts(gmailStatus.accounts || []);
+          }
+        } catch (err) {
+          console.error("Failed to refresh status after OAuth:", err);
+        }
+      };
+      
+      refreshAfterOAuth();
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     // Load settings from localStorage
     const savedDarkMode = localStorage.getItem('darkMode') === 'true';
     setDarkMode(savedDarkMode);
