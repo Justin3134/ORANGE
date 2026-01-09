@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, RefreshCw, CheckCircle, Clock, Sparkles, User, Mail, Hash, MessageSquare, Lock, Loader2, Twitter, Facebook, Instagram, Settings } from "lucide-react";
+import { ArrowLeft, RefreshCw, CheckCircle, Clock, Sparkles, User, Mail, Hash, MessageSquare, Lock, Loader2, Twitter, Facebook, Instagram, Settings, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_ITEMS, SYNC_ACTIVITY } from "@/config/constants";
-import { connectGmail, connectDiscord, connectSlack, syncGmail, syncDiscord, syncSlack, getUserStatus } from "@/lib/api";
+import { connectGmail, connectDiscord, connectSlack, syncGmail, syncDiscord, syncSlack, getUserStatus, getGmailStatus, disconnectGmailAccount } from "@/lib/api";
 import { useUser } from "@/contexts/UserContext";
 
 // Extended platform list
@@ -27,6 +27,7 @@ const Sync = () => {
   const [lastSync, setLastSync] = useState<Record<string, string>>({});
   const [memoriesCount, setMemoriesCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [gmailAccounts, setGmailAccounts] = useState<Array<{ email: string; name: string; connectedAt: string }>>([]);
   const location = useLocation();
 
   // Load user status on mount
@@ -36,6 +37,16 @@ const Sync = () => {
         const status = await getUserStatus(userId);
         setConnectedPlatforms(status.connectedServices || []);
         setMemoriesCount(status.memoriesCount || 0);
+        
+        // Load Gmail accounts if Gmail is connected
+        if (status.connectedServices?.includes('gmail')) {
+          try {
+            const gmailStatus = await getGmailStatus(userId);
+            setGmailAccounts(gmailStatus.accounts || []);
+          } catch (err) {
+            console.error("Failed to load Gmail status:", err);
+          }
+        }
       } catch (err) {
         console.error("Failed to load status:", err);
       } finally {
@@ -48,6 +59,10 @@ const Sync = () => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('gmail_connected') === 'true') {
       setConnectedPlatforms(prev => [...new Set([...prev, 'gmail'])]);
+      // Reload Gmail accounts after connection
+      getGmailStatus(userId).then(status => {
+        setGmailAccounts(status.accounts || []);
+      }).catch(err => console.error("Failed to load Gmail status:", err));
       window.history.replaceState({}, document.title, window.location.pathname);
     }
     if (urlParams.get('discord_connected') === 'true') {
@@ -228,6 +243,7 @@ const Sync = () => {
               {PLATFORMS.map((platform, i) => {
                 const isConnected = connectedPlatforms.includes(platform.id);
                 const isSyncing = syncing === platform.id;
+                const isGmail = platform.id === 'gmail';
 
                 return (
                   <motion.div
@@ -262,6 +278,11 @@ const Sync = () => {
                             <h4 className="font-semibold text-foreground">{platform.name}</h4>
                             {isConnected && (
                               <CheckCircle className="w-4 h-4 text-green-500" />
+                            )}
+                            {isGmail && isConnected && gmailAccounts.length > 0 && (
+                              <span className="text-xs bg-blue-500/20 text-blue-500 px-2 py-0.5 rounded-full">
+                                {gmailAccounts.length} account{gmailAccounts.length !== 1 ? 's' : ''}
+                              </span>
                             )}
                             {!platform.available && (
                               <span className="text-xs bg-black/10 text-muted-foreground px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -337,6 +358,59 @@ const Sync = () => {
                           )}
                         </div>
                       </div>
+
+                      {/* Gmail Accounts List - Only show for Gmail when connected */}
+                      {isGmail && isConnected && gmailAccounts.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                            Connected Accounts ({gmailAccounts.length})
+                          </p>
+                          {gmailAccounts.map((account) => {
+                            const emailId = account.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                            return (
+                              <div
+                                key={emailId}
+                                className="flex items-center justify-between p-2 rounded-lg bg-secondary/30 border border-border/30"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium truncate">{account.name || account.email}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{account.email}</p>
+                                </div>
+                                {gmailAccounts.length > 1 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={async () => {
+                                      try {
+                                        await disconnectGmailAccount(userId, emailId);
+                                        const gmailStatus = await getGmailStatus(userId);
+                                        setGmailAccounts(gmailStatus.accounts || []);
+                                        if (gmailStatus.accounts.length === 0) {
+                                          setConnectedPlatforms(prev => prev.filter(p => p !== 'gmail'));
+                                        }
+                                      } catch (err) {
+                                        console.error("Failed to disconnect:", err);
+                                      }
+                                    }}
+                                    className="h-6 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => connectGmail(userId, true)}
+                            className="w-full mt-2"
+                          >
+                            <Mail className="w-3 h-3 mr-1" />
+                            Add Another Account
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 );

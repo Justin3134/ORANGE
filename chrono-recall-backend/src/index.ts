@@ -19,6 +19,7 @@ import {
   getGmailAccountCount,
   getGmailAccounts
 } from './routes/gmailAuth';
+import { getMemorySignals } from './routes/memories';
 import {
   initiateDiscordAuth,
   handleDiscordCallback,
@@ -92,6 +93,9 @@ app.post('/api/sync-slack', syncSlackHandler);
 
 // Chat endpoint - AI-powered chat with email context
 app.post('/api/chat', handleChat);
+
+// Memory signals endpoint - AI-generated memory abstractions
+app.get('/api/memories/signals', getMemorySignals);
 
 // Recent emails/memories endpoint
 app.get('/api/memories/recent', getRecentEmails);

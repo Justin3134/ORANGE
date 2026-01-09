@@ -103,10 +103,10 @@ const SCOPES = [
 
 /**
  * Initiate Gmail OAuth flow
- * GET /auth/gmail?userId=<userId>
+ * GET /auth/gmail?userId=<userId>&add_account=<true|false>
  */
 export const initiateGmailAuth = (req: Request, res: Response) => {
-  const { userId } = req.query;
+  const { userId, add_account } = req.query;
 
   if (!userId) {
     return res.status(400).json({ error: 'userId is required' });
@@ -122,34 +122,46 @@ export const initiateGmailAuth = (req: Request, res: Response) => {
 
   const oauth2Client = createOAuth2Client();
 
+  // Encode userId and add_account flag in state parameter (format: userId|add_account)
+  const stateValue = `${userId}|${add_account === 'true' ? 'true' : 'false'}`;
+
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
-    state: userId as string, // Pass userId in state to retrieve after callback
+    state: stateValue, // Pass userId and add_account flag in state
     prompt: 'consent', // Force consent screen to get refresh token
   });
 
-  console.log(`Redirecting user ${userId} to Gmail OAuth...`);
+  console.log(`Redirecting user ${userId} to Gmail OAuth (add_account: ${add_account === 'true'})...`);
   res.redirect(authUrl);
 };
 
 /**
  * Handle Gmail OAuth callback
- * GET /auth/gmail/callback?code=<code>&state=<userId>
+ * GET /auth/gmail/callback?code=<code>&state=<userId|add_account>
  */
 export const handleGmailCallback = async (req: Request, res: Response) => {
-  const { code, state: userId, error } = req.query;
+  const { code, state, error } = req.query;
 
   if (error) {
     console.error('OAuth error:', error);
     return res.redirect(`${config.frontendUrl}/dashboard?gmail_error=${error}`);
   }
 
-  if (!code || !userId) {
+  if (!code || !state) {
     return res.redirect(`${config.frontendUrl}/dashboard?gmail_error=missing_params`);
   }
 
   try {
+    // Parse state parameter (format: userId|add_account)
+    const stateParts = (state as string).split('|');
+    const finalUserId = stateParts[0];
+    const addAccount = stateParts[1] === 'true';
+
+    if (!finalUserId) {
+      return res.redirect(`${config.frontendUrl}/dashboard?gmail_error=invalid_state`);
+    }
+
     const oauth2Client = createOAuth2Client();
 
     // Exchange code for tokens
@@ -162,8 +174,6 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
     const userEmail = userInfo.data.email || '';
     const userName = userInfo.data.name || userInfo.data.given_name || '';
 
-    // Use the userId from state (passed from frontend)
-    const finalUserId = userId as string;
     const emailId = userEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
     // Get or create user's account map
@@ -177,17 +187,23 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
     const existingAccount = userAccounts.get(emailId);
     if (existingAccount) {
       console.log(`🔄 Updating existing Gmail account for user ${finalUserId}: ${userEmail}`);
+      // Update tokens but keep original connectedAt
+      userAccounts.set(emailId, {
+        tokens,
+        email: userEmail,
+        name: userName,
+        connectedAt: existingAccount.connectedAt
+      });
     } else {
       console.log(`➕ Adding new Gmail account for user ${finalUserId}: ${userEmail}`);
+      // Add new account
+      userAccounts.set(emailId, {
+        tokens,
+        email: userEmail,
+        name: userName,
+        connectedAt: new Date().toISOString()
+      });
     }
-
-    // Store account data
-    userAccounts.set(emailId, {
-      tokens,
-      email: userEmail,
-      name: userName,
-      connectedAt: existingAccount?.connectedAt || new Date().toISOString()
-    });
     
     saveTokens(tokenStore); // Persist to file
 
@@ -197,6 +213,7 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
     // Redirect back to frontend with success and user info
     const redirectUrl = new URL(`${config.frontendUrl}/dashboard`);
     redirectUrl.searchParams.set('gmail_connected', 'true');
+    redirectUrl.searchParams.set('gmail_account_added', addAccount ? 'true' : 'false');
     redirectUrl.searchParams.set('email', userEmail);
     redirectUrl.searchParams.set('name', userName);
     redirectUrl.searchParams.set('account_count', accountCount.toString());

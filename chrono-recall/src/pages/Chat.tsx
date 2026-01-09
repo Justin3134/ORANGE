@@ -626,21 +626,15 @@ const Chat = () => {
           <div className="max-w-3xl mx-auto">
             {/* Label Button - Show when there are more than 5 Gmail results */}
             {lastTotalGmail > 5 && lastGmailIds.length > 0 && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-3 flex items-center justify-end"
-              >
+              <div className="mb-3 flex items-center justify-end">
                 <Button
                   onClick={handleLabelEmails}
                   disabled={isLabeling}
                   className={cn(
                     "gap-2 text-white",
                     "bg-blue-500 hover:bg-blue-600",
-                    "animate-pulse hover:animate-none",
-                    "transition-all duration-200",
-                    "shadow-lg hover:shadow-xl",
-                    "border-0"
+                    "transition-colors duration-200",
+                    "shadow hover:shadow-md"
                   )}
                   size="sm"
                 >
@@ -656,7 +650,7 @@ const Chat = () => {
                     </>
                   )}
                 </Button>
-              </motion.div>
+              </div>
             )}
 
             {/* Platform selector pills */}

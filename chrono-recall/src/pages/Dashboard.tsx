@@ -5,7 +5,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { syncFake, searchMemories, connectGmail, connectDiscord, syncGmail, getUserStatus, getRecentMemories } from "@/lib/api";
+import { syncFake, searchMemories, connectGmail, connectDiscord, syncGmail, getUserStatus, getMemorySignals } from "@/lib/api";
 import {
   SIDEBAR_ITEMS,
   TYPE_COLORS,
@@ -27,18 +27,19 @@ const Dashboard = () => {
   const [hasSyncedData, setHasSyncedData] = useState(false);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
   const [gmailConnected, setGmailConnected] = useState(false);
-  const [recentMemories, setRecentMemories] = useState<any[]>([]);
+  const [memorySignals, setMemorySignals] = useState<any[]>([]);
   const [isLoadingMemories, setIsLoadingMemories] = useState(false);
   const location = useLocation();
 
-  // Fetch recent memories when connected
+  // Fetch memory signals when connected
   const fetchRecentMemories = async () => {
     setIsLoadingMemories(true);
     try {
-      const data = await getRecentMemories(userId, 5);
-      setRecentMemories(data.memories || []);
+      const data = await getMemorySignals(userId, 5);
+      setMemorySignals(data.memories || []);
     } catch (err) {
-      console.error("Failed to fetch recent memories:", err);
+      console.error("Failed to fetch memory signals:", err);
+      setMemorySignals([]);
     } finally {
       setIsLoadingMemories(false);
     }
@@ -267,7 +268,7 @@ const Dashboard = () => {
               {searchResults.length > 0
                 ? `Search Results ${isSearching ? '(Searching...)' : ''}`
                 : hasSyncedData
-                  ? 'Recent Memories'
+                  ? 'Memory Signals'
                   : 'Get Started'
               }
             </h2>
@@ -444,54 +445,90 @@ const Dashboard = () => {
                 );
               })
             ) : hasSyncedData ? (
-              // Show recent memories when synced - real data from API
+              // Show memory signals when synced - AI-generated memory abstractions
               isLoadingMemories ? (
                 <div className="text-center py-8">
                   <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-                  <p className="text-muted-foreground">Loading your emails...</p>
+                  <p className="text-muted-foreground">Analyzing your memories...</p>
                 </div>
-              ) : recentMemories.length > 0 ? (
-                recentMemories.map((memory, i) => (
-                  <motion.div
-                    key={memory.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + i * 0.05 }}
-                    onClick={() => {
-                      setSelectedResult(memory.id);
-                      if (memory.url) {
-                        window.open(memory.url, '_blank');
-                      }
-                    }}
-                    className={cn(
-                      "glass-card p-4 cursor-pointer transition-all duration-300 hover:border-primary/30 glow-effect",
-                      selectedResult === memory.id && "border-primary/30 shadow-lg shadow-primary/10"
-                    )}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-red-500/20 text-red-500">
-                        <Mail className="w-5 h-5" />
-                      </div>
+              ) : memorySignals.length > 0 ? (
+                memorySignals.map((memory, i) => {
+                  const typeColors: Record<string, string> = {
+                    Decision: 'bg-blue-500/20 text-blue-500 border-blue-500/30',
+                    Risk: 'bg-red-500/20 text-red-500 border-red-500/30',
+                    'Open Question': 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30',
+                    Commitment: 'bg-green-500/20 text-green-500 border-green-500/30',
+                    Insight: 'bg-purple-500/20 text-purple-500 border-purple-500/30',
+                  };
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-500/20 text-red-500">
-                            Gmail
-                          </span>
-                          <span className="text-xs text-muted-foreground truncate max-w-[150px]">{memory.from}</span>
-                          <span className="text-xs text-muted-foreground ml-auto">{memory.date}</span>
+                  return (
+                    <motion.div
+                      key={memory.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 + i * 0.05 }}
+                      onClick={() => {
+                        setSelectedResult(memory.id);
+                      }}
+                      className={cn(
+                        "glass-card p-4 cursor-pointer transition-all duration-300 hover:border-primary/30",
+                        memory.unresolved && "border-l-4 border-l-yellow-500",
+                        selectedResult === memory.id && "border-primary/30 shadow-lg shadow-primary/10"
+                      )}
+                    >
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className={cn(
+                          "px-2 py-1 rounded text-xs font-medium border",
+                          typeColors[memory.type] || 'bg-gray-500/20 text-gray-500 border-gray-500/30'
+                        )}>
+                          {memory.type}
                         </div>
-                        <h3 className="font-medium text-foreground mb-1 truncate">{memory.title}</h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{memory.snippet}</p>
+                        {memory.unresolved && (
+                          <div className="px-2 py-1 rounded text-xs font-medium bg-yellow-500/20 text-yellow-500 border border-yellow-500/30">
+                            Unresolved
+                          </div>
+                        )}
                       </div>
 
-                      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0 mt-2" />
-                    </div>
-                  </motion.div>
-                ))
+                      <h3 className="font-semibold text-foreground mb-2">{memory.title}</h3>
+                      <p className="text-sm text-muted-foreground mb-3">{memory.summary}</p>
+
+                      {memory.highlightedQuotes && memory.highlightedQuotes.length > 0 && (
+                        <div className="bg-secondary/50 rounded-lg p-3 mb-3 border-l-2 border-primary/50">
+                          {memory.highlightedQuotes.map((quote: string, idx: number) => (
+                            <p key={idx} className="text-sm italic text-muted-foreground mb-1">
+                              "{quote}"
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {memory.sourceEmail && (
+                            <span>raised by {memory.sourceEmail.split('<')[0].trim() || memory.sourceEmail.split('@')[0]}</span>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (memory.gmailUrl) {
+                              window.open(memory.gmailUrl, '_blank');
+                            }
+                          }}
+                          className="text-xs h-7"
+                        >
+                          View in Gmail
+                        </Button>
+                      </div>
+                    </motion.div>
+                  );
+                })
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No emails found. Try syncing your Gmail.</p>
+                  <p className="text-muted-foreground">No critical memories to show right now.</p>
                 </div>
               )
             ) : (

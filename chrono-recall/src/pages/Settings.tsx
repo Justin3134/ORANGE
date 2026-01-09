@@ -308,7 +308,7 @@ const Settings = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => connectGmail(userId)}
+                      onClick={() => connectGmail(userId, true)}
                       className="gap-2"
                     >
                       <Mail className="w-4 h-4" />

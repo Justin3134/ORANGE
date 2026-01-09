@@ -38,9 +38,14 @@ export async function searchMemories(userId: string = DEFAULT_USER_ID, query: st
   return res.json(); // { rawQuery, parsed, results }
 }
 
-export async function connectGmail(userId: string = DEFAULT_USER_ID) {
-  // Redirect to Gmail OAuth
-  window.location.href = `${BACKEND_URL}/auth/gmail?userId=${userId}`;
+export async function connectGmail(userId: string = DEFAULT_USER_ID, addAccount: boolean = false) {
+  // Redirect to Gmail OAuth with add_account flag
+  const url = new URL(`${BACKEND_URL}/auth/gmail`);
+  url.searchParams.set('userId', userId);
+  if (addAccount) {
+    url.searchParams.set('add_account', 'true');
+  }
+  window.location.href = url.toString();
 }
 
 export async function connectDiscord(userId: string = DEFAULT_USER_ID) {
@@ -235,6 +240,17 @@ export async function getRecentMemories(userId: string = DEFAULT_USER_ID, limit:
 
   if (!res.ok) {
     throw new Error("Failed to get recent memories");
+  }
+
+  return res.json(); // { memories, total }
+}
+
+// Get memory signals (AI-generated memory abstractions)
+export async function getMemorySignals(userId: string = DEFAULT_USER_ID, limit: number = 5) {
+  const res = await fetch(`${BACKEND_URL}/api/memories/signals?userId=${userId}&limit=${limit}`);
+
+  if (!res.ok) {
+    throw new Error("Failed to get memory signals");
   }
 
   return res.json(); // { memories, total }
