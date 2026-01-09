@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, RefreshCw, CheckCircle, Clock, Sparkles, User, Mail, Hash, MessageSquare, Lock, Loader2, Twitter, Facebook, Instagram, Settings, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { SIDEBAR_ITEMS, SYNC_ACTIVITY } from "@/config/constants";
+import { SIDEBAR_ITEMS } from "@/config/constants";
 import { connectGmail, connectDiscord, connectSlack, syncGmail, syncDiscord, syncSlack, getUserStatus, getGmailStatus, disconnectGmailAccount } from "@/lib/api";
 import { useUser } from "@/contexts/UserContext";
 
@@ -28,7 +28,23 @@ const Sync = () => {
   const [memoriesCount, setMemoriesCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [gmailAccounts, setGmailAccounts] = useState<Array<{ email: string; name: string; connectedAt: string }>>([]);
+  const [syncActivity, setSyncActivity] = useState<Array<{ service: string; action: string; time: string; status: string }>>([]);
   const location = useLocation();
+
+  // Helper to format time ago
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+  };
 
   // Load user status on mount
   useEffect(() => {
@@ -98,21 +114,52 @@ const Sync = () => {
 
   const handleSync = async (platformId: string) => {
     setSyncing(platformId);
+    const syncStartTime = new Date();
     try {
+      let syncResult: any = null;
       if (platformId === 'gmail') {
-        const result = await syncGmail(userId);
-        setMemoriesCount(prev => prev + (result.synced || 0));
+        syncResult = await syncGmail(userId);
+        const syncedCount = syncResult.synced || 0;
+        setMemoriesCount(prev => prev + syncedCount);
+        // Add activity
+        setSyncActivity(prev => [{
+          service: 'Gmail',
+          action: `Synced ${syncedCount} email${syncedCount !== 1 ? 's' : ''}`,
+          time: formatTimeAgo(syncStartTime),
+          status: 'success'
+        }, ...prev.slice(0, 9)]); // Keep last 10 activities
       } else if (platformId === 'discord') {
-        const result = await syncDiscord(userId);
-        setMemoriesCount(prev => prev + (result.synced || 0));
+        syncResult = await syncDiscord(userId);
+        const syncedCount = syncResult.synced || 0;
+        setMemoriesCount(prev => prev + syncedCount);
+        setSyncActivity(prev => [{
+          service: 'Discord',
+          action: `Synced ${syncedCount} message${syncedCount !== 1 ? 's' : ''}`,
+          time: formatTimeAgo(syncStartTime),
+          status: 'success'
+        }, ...prev.slice(0, 9)]);
       } else if (platformId === 'slack') {
-        const result = await syncSlack(userId);
-        setMemoriesCount(prev => prev + (result.messagesCount || 0));
+        syncResult = await syncSlack(userId);
+        const syncedCount = syncResult.messagesCount || 0;
+        setMemoriesCount(prev => prev + syncedCount);
+        setSyncActivity(prev => [{
+          service: 'Slack',
+          action: `Synced ${syncedCount} message${syncedCount !== 1 ? 's' : ''}`,
+          time: formatTimeAgo(syncStartTime),
+          status: 'success'
+        }, ...prev.slice(0, 9)]);
       }
-      await new Promise(resolve => setTimeout(resolve, 1000));
       setLastSync(prev => ({ ...prev, [platformId]: 'Just now' }));
     } catch (error: any) {
       console.error('Sync error:', error);
+      // Add error activity
+      setSyncActivity(prev => [{
+        service: platformId.charAt(0).toUpperCase() + platformId.slice(1),
+        action: `Sync failed: ${error.message || 'Unknown error'}`,
+        time: formatTimeAgo(syncStartTime),
+        status: 'error'
+      }, ...prev.slice(0, 9)]);
+      
       if (error.message?.includes('not authenticated') || error.message?.includes('not connected')) {
         if (platformId === 'gmail') {
           connectGmail(userId);
@@ -426,28 +473,29 @@ const Sync = () => {
           >
             <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
             <div className="glass-card divide-y divide-border/50">
-              {SYNC_ACTIVITY.map((activity, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 + i * 0.05 }}
-                  className="p-4 flex items-center gap-4"
-                >
-                  <div className={cn(
-                    "w-2 h-2 rounded-full",
-                    activity.status === 'success' ? "bg-green-500" : "bg-yellow-500"
-                  )} />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{activity.service}</p>
-                    <p className="text-xs text-muted-foreground">{activity.action}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{activity.time}</p>
-                </motion.div>
-              ))}
-              {SYNC_ACTIVITY.length === 0 && (
+              {syncActivity.length > 0 ? (
+                syncActivity.map((activity, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 + i * 0.05 }}
+                    className="p-4 flex items-center gap-4"
+                  >
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      activity.status === 'success' ? "bg-green-500" : "bg-red-500"
+                    )} />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{activity.service}</p>
+                      <p className="text-xs text-muted-foreground">{activity.action}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{activity.time}</p>
+                  </motion.div>
+                ))
+              ) : (
                 <div className="p-8 text-center text-muted-foreground">
-                  <p>No activity yet. Connect a service to get started!</p>
+                  <p>No activity yet. Sync a service to see activity here.</p>
                 </div>
               )}
             </div>

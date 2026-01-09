@@ -5,7 +5,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // File-based token store for persistence across server restarts
-const TOKEN_FILE = path.join(__dirname, '../../.tokens.json');
+// Use absolute path to ensure it works in production
+const TOKEN_FILE = path.resolve(__dirname, '../../.tokens.json');
 
 // Interface for Gmail account data
 interface GmailAccount {
@@ -69,11 +70,55 @@ function saveTokens(store: TokenStore) {
     // Convert Map to plain object for JSON serialization
     const data: any = {};
     for (const [userId, accounts] of store.entries()) {
-      data[userId] = Object.fromEntries(accounts);
+      const accountsObj: any = {};
+      for (const [emailId, account] of accounts.entries()) {
+        // Ensure tokens are properly serialized (they should be plain objects)
+        accountsObj[emailId] = {
+          tokens: account.tokens, // OAuth tokens are already plain objects
+          email: account.email,
+          name: account.name,
+          connectedAt: account.connectedAt
+        };
+      }
+      data[userId] = accountsObj;
     }
+    
+    // Ensure directory exists
+    const dir = path.dirname(TOKEN_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
     fs.writeFileSync(TOKEN_FILE, JSON.stringify(data, null, 2));
+    const totalAccounts = Array.from(store.values()).reduce((sum, accounts) => sum + accounts.size, 0);
+    console.log(`💾 Saved token store: ${store.size} user(s) with ${totalAccounts} account(s)`);
   } catch (err) {
     console.error('Error saving tokens:', err);
+    // Try to ensure directory exists and retry
+    try {
+      const dir = path.dirname(TOKEN_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      // Rebuild data for retry
+      const data: any = {};
+      for (const [userId, accounts] of store.entries()) {
+        const accountsObj: any = {};
+        for (const [emailId, account] of accounts.entries()) {
+          accountsObj[emailId] = {
+            tokens: account.tokens,
+            email: account.email,
+            name: account.name,
+            connectedAt: account.connectedAt
+          };
+        }
+        data[userId] = accountsObj;
+      }
+      fs.writeFileSync(TOKEN_FILE, JSON.stringify(data, null, 2));
+      console.log('💾 Retry: Successfully saved tokens');
+    } catch (retryErr) {
+      console.error('Error saving tokens on retry:', retryErr);
+    }
   }
 }
 
@@ -205,10 +250,18 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
       });
     }
     
-    saveTokens(tokenStore); // Persist to file
+    // Ensure the store is updated
+    tokenStore.set(finalUserId, userAccounts);
+    
+    // Persist to file immediately
+    saveTokens(tokenStore);
 
     const accountCount = userAccounts.size;
+    const totalAccounts = Array.from(tokenStore.values()).reduce((sum, accounts) => sum + accounts.size, 0);
     console.log(`✅ Gmail connected for user ${finalUserId} (${userEmail}). Total accounts: ${accountCount}`);
+    console.log(`📋 Token store status: ${tokenStore.size} user(s), ${totalAccounts} total account(s)`);
+    console.log(`💾 Token file location: ${TOKEN_FILE}`);
+    console.log(`📋 Token store status: ${tokenStore.size} user(s), ${Array.from(tokenStore.values()).reduce((sum, accounts) => sum + accounts.size, 0)} total account(s)`);
 
     // Redirect back to frontend with success and user info
     const redirectUrl = new URL(`${config.frontendUrl}/dashboard`);
