@@ -279,16 +279,21 @@ const Chat = () => {
         accountIndex: m.accountIndex 
       })) || [];
       
-      if (selectedPlatforms.includes('gmail') && gmailCount > 5 && gmailEmails.length > 5) {
+      // Use the actual count from allGmailEmails array, not totalGmailCount
+      // This ensures we show the correct number of emails found
+      const actualGmailCount = gmailEmails.length > 0 ? gmailEmails.length : gmailCount;
+      
+      if (selectedPlatforms.includes('gmail') && actualGmailCount > 5 && gmailEmails.length > 5) {
         console.log('✅ Setting label state:', {
           totalGmailCount: gmailCount,
+          actualGmailCount: actualGmailCount,
           allGmailEmailsLength: gmailEmails.length,
           searchQuery: messageText
         });
         setLastSearchQuery(messageText);
         setLastGmailIds(gmailIds);
         setLastGmailEmails(gmailEmails);
-        setLastTotalGmail(gmailCount);
+        setLastTotalGmail(actualGmailCount); // Use actual count from emails array
       } else {
         console.log('❌ Clearing label state:', {
           hasGmail: selectedPlatforms.includes('gmail'),
@@ -815,7 +820,7 @@ const Chat = () => {
                   ) : (
                     <>
                       <Tag className="w-4 h-4" />
-                      Label {lastTotalGmail - 5}+ emails
+                      Label {lastGmailEmails.length - 5}+ emails
                     </>
                   )}
                 </Button>

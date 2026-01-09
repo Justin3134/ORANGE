@@ -266,9 +266,9 @@ async function searchSingleGmailAccount(
           date: getHeader('Date'),
           snippet: fullMessage.data.snippet,
           body: body.substring(0, 1500),
-          // Use Gmail search URL with message ID - works across all accounts
-          // Gmail will automatically route to the correct account where the message exists
-          url: `https://mail.google.com/mail/u/0/#search/rfc822msgid:${msg.id}`,
+          // Use Gmail URL with account email in search to route to correct account
+          // Gmail will find the message in the specific account where it exists
+          url: `https://mail.google.com/mail/u/0/#search/${encodeURIComponent(accountEmail)}+rfc822msgid:${msg.id}`,
           accountEmail, // Add account identifier
           accountIndex // Store account index for reference
         });
