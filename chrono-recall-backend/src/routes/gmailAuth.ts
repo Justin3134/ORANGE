@@ -221,12 +221,17 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
 
     const emailId = userEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
     
-    // If userId was 'guest', generate userId from email instead
-    // This ensures accounts are stored under the correct userId from the start
+    // CRITICAL: Determine the actual userId to use
+    // - If userId was 'guest', generate userId from email (first-time login)
+    // - Otherwise, use the provided userId (for adding accounts to existing user)
+    // This ensures all accounts for a user are stored under the same userId
     let actualUserId = finalUserId;
     if (finalUserId === 'guest' || !finalUserId) {
-      actualUserId = emailId; // Use email-based userId for guest users
-      console.log(`🔄 Converting guest userId to email-based userId: ${actualUserId}`);
+      actualUserId = emailId; // Use email-based userId for guest users (first account)
+      console.log(`🔄 Converting guest userId to email-based userId: ${actualUserId} (first-time login)`);
+    } else {
+      // User is logged in - use the provided userId to ensure all accounts are stored together
+      console.log(`✅ Using provided userId: ${actualUserId} (adding account to existing user)`);
     }
 
     // Get or create user's account map
@@ -234,13 +239,16 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
     if (!userAccounts) {
       userAccounts = new Map();
       tokenStore.set(actualUserId, userAccounts);
+      console.log(`📁 Created new account map for userId: ${actualUserId}`);
+    } else {
+      console.log(`📁 Using existing account map for userId: ${actualUserId} (${userAccounts.size} existing account(s))`);
     }
 
-    // Check if this email is already connected
+    // Check if this email is already connected to this userId
     const existingAccount = userAccounts.get(emailId);
     if (existingAccount) {
-      console.log(`🔄 Updating existing Gmail account for user ${actualUserId}: ${userEmail}`);
-      // Update tokens but keep original connectedAt
+      console.log(`🔄 Updating existing Gmail account tokens for user ${actualUserId}: ${userEmail}`);
+      // Update tokens but keep original connectedAt timestamp
       userAccounts.set(emailId, {
         tokens,
         email: userEmail,
@@ -248,8 +256,8 @@ export const handleGmailCallback = async (req: Request, res: Response) => {
         connectedAt: existingAccount.connectedAt
       });
     } else {
-      console.log(`➕ Adding new Gmail account for user ${actualUserId}: ${userEmail}`);
-      // Add new account
+      console.log(`➕ Adding NEW Gmail account to user ${actualUserId}: ${userEmail} (total accounts will be: ${userAccounts.size + 1})`);
+      // Add new account to the user's account map
       userAccounts.set(emailId, {
         tokens,
         email: userEmail,

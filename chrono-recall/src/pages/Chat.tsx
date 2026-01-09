@@ -39,13 +39,27 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  sources?: { platform: string; title: string; url?: string }[];
+  sources?: { platform: string; title: string; url?: string; accountEmail?: string }[];
 }
 
 interface Conversation {
   id: string;
   title: string;
   timestamp: Date;
+}
+
+interface ChatResponse {
+  response: string;
+  sources?: { platform: string; title: string; url?: string; accountEmail?: string }[];
+  connectedServices?: string[];
+  searchResults?: {
+    gmail?: Array<{ id: string; subject: string; snippet?: string; accountEmail?: string }>;
+    discord?: any[];
+    slack?: any[];
+  };
+  totalGmailCount?: number;
+  allGmailIds?: string[];
+  hasRelevantSources?: boolean;
 }
 
 // Available MCP servers/platforms
@@ -151,7 +165,7 @@ const Chat = () => {
 
     try {
       // Call the actual backend API
-      const response = await sendChatMessage(userId, messageText, selectedPlatforms);
+      const response: ChatResponse = await sendChatMessage(userId, messageText, selectedPlatforms);
 
       // Debug: Log response to see what we're getting
       console.log('Chat response:', {

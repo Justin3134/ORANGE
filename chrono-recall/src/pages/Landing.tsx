@@ -103,11 +103,12 @@ const Landing = () => {
   const handleConnect = (platformId: string) => {
     setIsConnecting(true);
     
-    // Generate userId from email if user is authenticated, otherwise use 'guest'
-    // Note: When OAuth completes, the backend will use the actual email from Google
-    // to store accounts. The Dashboard OAuth handler will then login the user with
-    // that email, generating the correct userId.
+    // CRITICAL: Always use current userId if user is authenticated
+    // If not authenticated, use 'guest' (backend will convert to email-based userId)
+    // This ensures accounts are stored under the correct userId
     const connectUserId = isAuthenticated && user ? userId : 'guest';
+    
+    console.log(`🔗 Connecting ${platformId} for userId: ${connectUserId} (authenticated: ${isAuthenticated})`);
     
     if (platformId === 'gmail') {
       connectGmail(connectUserId, false);

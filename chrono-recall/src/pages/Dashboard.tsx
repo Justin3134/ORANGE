@@ -16,7 +16,7 @@ import { useUser } from "@/contexts/UserContext";
 import { toast } from "sonner";
 
 const Dashboard = () => {
-  const { user, login } = useUser();
+  const { user, login, isLoading: userLoading } = useUser();
   const isAuthenticated = !!user;
   const userId = user?.id || 'guest';
 
@@ -48,7 +48,13 @@ const Dashboard = () => {
   }, [userId]);
 
   // Handle OAuth callback - refresh status without changing userId
+  // Wait for UserContext to finish loading before processing OAuth callback
   useEffect(() => {
+    // Don't process OAuth callback until UserContext has finished loading
+    if (userLoading) {
+      return;
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const gmailConnectedParam = urlParams.get('gmail_connected');
     const gmailAccountAdded = urlParams.get('gmail_account_added');
@@ -59,14 +65,18 @@ const Dashboard = () => {
     const callbackUserId = urlParams.get('userId'); // Get userId from redirect
 
     if (gmailConnectedParam === 'true' || discordConnectedParam === 'true' || slackConnectedParam === 'true') {
+      console.log('🔄 OAuth callback detected:', { email, name, callbackUserId, isAuthenticated, currentUserId: userId });
+      
       const refreshStatusAfterOAuth = async (useUserId: string | null) => {
         if (!useUserId || useUserId === 'guest') {
-          console.warn('Cannot refresh status: invalid userId', useUserId);
+          console.warn('⚠️ Cannot refresh status: invalid userId', useUserId);
           return;
         }
 
+        console.log(`📡 Refreshing status for userId: ${useUserId}`);
         try {
           const status = await getUserStatus(useUserId);
+          console.log(`✅ Status retrieved:`, { connectedServices: status.connectedServices, gmailAccounts: status.gmailAccounts?.length });
           setConnectedPlatforms(status.connectedServices || []);
           
           if (status.connectedServices?.includes('gmail')) {
@@ -91,59 +101,65 @@ const Dashboard = () => {
             setHasSyncedData(true);
           }
         } catch (err) {
-          console.error("Failed to refresh status after OAuth:", err);
+          console.error("❌ Failed to refresh status after OAuth:", err);
         }
       };
 
-      // Determine which userId to use
-      // When user is already logged in, ALWAYS use current userId (where accounts are stored)
-      // Only use callbackUserId/email if user is NOT logged in yet
-      let targetUserId: string | null = null;
-
-      if (!user || !isAuthenticated) {
-        // User not logged in yet - determine userId from callback
-        if (callbackUserId) {
-          targetUserId = callbackUserId;
-        } else if (email) {
-          // Generate userId from email (same logic as UserContext)
-          targetUserId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        } else {
-          targetUserId = null;
-        }
-      } else {
-        // User is already logged in - ALWAYS use current userId (accounts are stored here)
-        // This is critical: when adding a second account, accounts are stored under current userId
-        targetUserId = userId !== 'guest' ? userId : null;
-        console.log(`🔄 User already logged in, using current userId: ${targetUserId} (callback had: ${callbackUserId})`);
-      }
-
-      // Only login if user is not already authenticated
-      // This prevents changing userId when adding additional accounts
-      if (!user || !isAuthenticated) {
-        if (email && targetUserId) {
+      // CRITICAL FIX: Always ensure user is logged in when email is present
+      // This is the root cause of login not being remembered
+      if (email) {
+        const emailBasedUserId = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        
+        // If user is NOT logged in, always log them in with the email from OAuth
+        if (!user || !isAuthenticated) {
+          console.log(`🔐 Logging in new user: ${email} (userId: ${emailBasedUserId})`);
           login(email, name || undefined);
-          // Wait for login to complete, then refresh with targetUserId
+          
+          // Wait a bit for login to persist to localStorage, then refresh
           setTimeout(() => {
-            refreshStatusAfterOAuth(targetUserId);
-          }, 300);
-        } else if (targetUserId) {
-          refreshStatusAfterOAuth(targetUserId);
+            refreshStatusAfterOAuth(emailBasedUserId);
+          }, 200);
+        } else {
+          // User is already logged in - this means we're adding another account
+          // ALWAYS use the current userId (where accounts are stored)
+          // The backend stores all accounts under the same userId
+          const currentUserId = userId !== 'guest' ? userId : emailBasedUserId;
+          console.log(`✅ User already logged in: ${user.email} (userId: ${currentUserId})`);
+          console.log(`➕ Adding additional account to existing userId: ${currentUserId}`);
+          
+          // Update user info if name is provided (optional)
+          if (name && user.name !== name) {
+            console.log(`📝 Updating user name: ${user.name} -> ${name}`);
+            login(user.email, name); // Update name but keep same email/userId
+          }
+          
+          // Refresh with current userId to get all accounts (including the newly added one)
+          refreshStatusAfterOAuth(currentUserId);
+        }
+      } else if (callbackUserId && callbackUserId !== 'guest') {
+        // Fallback: if no email but userId is present (shouldn't happen but handle it)
+        console.warn('⚠️ No email in OAuth callback, using callbackUserId:', callbackUserId);
+        if (!user || !isAuthenticated) {
+          // Can't login without email, but can still refresh status
+          refreshStatusAfterOAuth(callbackUserId);
+        } else {
+          // Use current userId if logged in
+          const currentUserId = userId !== 'guest' ? userId : callbackUserId;
+          refreshStatusAfterOAuth(currentUserId);
         }
       } else {
-        // User is already logged in - use current userId to fetch accounts
-        // This ensures we get accounts stored under the current userId
-        if (targetUserId && targetUserId !== 'guest') {
-          refreshStatusAfterOAuth(targetUserId);
-        }
+        console.error('❌ OAuth callback missing both email and userId!');
       }
 
       const service = gmailConnectedParam ? 'Gmail' : discordConnectedParam ? 'Discord' : 'Slack';
       toast.success(`Successfully connected ${service}${gmailAccountAdded === 'true' ? ' (account added)' : ''}!`);
 
-      // Clean up URL immediately
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Clean up URL after a short delay to ensure state updates complete
+      setTimeout(() => {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }, 100);
     }
-  }, [login, user, isAuthenticated, userId]);
+  }, [login, user, isAuthenticated, userId, userLoading]);
 
   // Check user status on mount
   useEffect(() => {

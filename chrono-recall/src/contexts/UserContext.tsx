@@ -34,22 +34,46 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        setUser(parsed);
+        // Validate the stored user object has required fields
+        if (parsed && parsed.email && parsed.id) {
+          setUser(parsed);
+          console.log(`✅ User loaded from localStorage: ${parsed.email} (userId: ${parsed.id})`);
+        } else {
+          console.warn('⚠️ Invalid user data in localStorage, clearing it');
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } else {
+        console.log('ℹ️ No user found in localStorage');
       }
     } catch (e) {
-      console.error('Failed to load user from storage:', e);
+      console.error('❌ Failed to load user from storage:', e);
+      // Clear corrupted data
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (clearError) {
+        console.error('❌ Failed to clear corrupted localStorage:', clearError);
+      }
     }
     setIsLoading(false);
   }, []);
 
   const login = useCallback((email: string, name?: string) => {
+    const normalizedEmail = email.toLowerCase().trim();
     const newUser: User = {
-      id: generateUserId(email),
-      email: email.toLowerCase(),
-      name: name || email.split('@')[0],
+      id: generateUserId(normalizedEmail),
+      email: normalizedEmail,
+      name: name || normalizedEmail.split('@')[0],
     };
-    setUser(newUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
+    
+    try {
+      setUser(newUser);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
+      console.log(`✅ User logged in and saved to localStorage: ${normalizedEmail} (userId: ${newUser.id})`);
+    } catch (error) {
+      console.error('❌ Failed to save user to localStorage:', error);
+      // Still set user in state even if localStorage fails
+      setUser(newUser);
+    }
   }, []);
 
   const logout = useCallback(() => {
