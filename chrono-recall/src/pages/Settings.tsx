@@ -32,6 +32,13 @@ import { Input } from "@/components/ui/input";
 import { getUserStatus, disconnectService, connectGmail, connectDiscord, getDiscordStatus, disconnectDiscord, getGmailStatus, disconnectGmailAccount, updateGmailAccountIndex } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/contexts/UserContext";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -45,6 +52,7 @@ const Settings = () => {
   const [gmailAccounts, setGmailAccounts] = useState<Array<{ email: string; name: string; connectedAt: string; gmailAccountIndex?: number }>>([]);
   const [editingIndex, setEditingIndex] = useState<string | null>(null);
   const [indexValue, setIndexValue] = useState<number>(0);
+  const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [memoriesCount, setMemoriesCount] = useState(0);
@@ -527,24 +535,22 @@ const Settings = () => {
                                 >
                                   Edit
                                 </button>
-                                {/* Info icon with tooltip */}
-                                <div className="relative group" style={{ zIndex: 100 }}>
+                                {/* Info icon - clickable */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setShowInfoDialog(true);
+                                  }}
+                                  className="cursor-pointer hover:opacity-70 transition-opacity"
+                                  aria-label="Learn more about Gmail Account Index"
+                                >
                                   <Info className={cn(
-                                    "w-3.5 h-3.5 cursor-help",
-                                    darkMode ? "text-white/40" : "text-muted-foreground"
+                                    "w-3.5 h-3.5",
+                                    darkMode ? "text-white/40 hover:text-white/70" : "text-muted-foreground hover:text-foreground"
                                   )} />
-                                  <div className={cn(
-                                    "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-[100] pointer-events-none",
-                                    darkMode ? "bg-black/90 border border-white/20" : "bg-popover border border-border"
-                                  )}>
-                                    <p className={cn("text-xs leading-relaxed", darkMode ? "text-white" : "text-foreground")}>
-                                      <strong>Gmail Account Index:</strong><br />
-                                      Open Gmail and make sure you're viewing this email account. Then look at the number in the address bar (u/0, u/1, etc.) and enter it here. This helps Recall Jump open emails in the correct Gmail account.
-                                      <br /><br />
-                                      <strong>Note:</strong> This number may change if you add/remove Google accounts or use a different browser/device.
-                                    </p>
-                                  </div>
-                                </div>
+                                </button>
                               </div>
                             )}
                           </div>
@@ -876,6 +882,42 @@ const Settings = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Info Dialog */}
+      <Dialog open={showInfoDialog} onOpenChange={setShowInfoDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gmail Account Index</DialogTitle>
+            <DialogDescription className="pt-4 space-y-3">
+              <p className="text-sm leading-relaxed">
+                <strong>What is this?</strong>
+                <br />
+                The Gmail Account Index is the number shown in your Gmail URL address bar (u/0, u/1, u/2, etc.). This number helps Recall Jump open emails in the correct Gmail account when you have multiple accounts connected.
+              </p>
+              <p className="text-sm leading-relaxed">
+                <strong>How to find it:</strong>
+                <br />
+                1. Open Gmail in your browser
+                <br />
+                2. Make sure you're viewing the email account you want to map
+                <br />
+                3. Look at the URL address bar - you'll see something like <code className="bg-muted px-1 rounded">mail.google.com/mail/u/2/#inbox</code>
+                <br />
+                4. The number after <code className="bg-muted px-1 rounded">u/</code> is your account index (in this example, it's 2)
+              </p>
+              <p className="text-sm leading-relaxed">
+                <strong>Important notes:</strong>
+                <br />
+                • This number may change if you add or remove Google accounts from your browser
+                <br />
+                • Each browser/device has its own index mapping
+                <br />
+                • The index is stored per browser/device, so it's specific to where you're using Recall Jump
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
