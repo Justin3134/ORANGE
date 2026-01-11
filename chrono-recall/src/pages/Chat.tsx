@@ -26,6 +26,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Tag,
+  Trash2,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -380,6 +381,65 @@ const Chat = () => {
     setCurrentConversationId(null);
   };
 
+  const deleteConversation = (conversationId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    try {
+      // Load current chat history
+      const stored = localStorage.getItem('chat_history');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const allMessages = parsed.messages || [];
+        const allConversations = parsed.conversations || [];
+        
+        // Remove the conversation
+        const updatedConversations = allConversations.filter((conv: Conversation) => conv.id !== conversationId);
+        
+        // Remove all messages belonging to this conversation
+        const updatedMessages = allMessages.filter((msg: Message) => msg.conversationId !== conversationId);
+        
+        // Save updated history
+        localStorage.setItem('chat_history', JSON.stringify({
+          messages: updatedMessages,
+          conversations: updatedConversations
+        }));
+        
+        // Update state
+        setConversations(updatedConversations);
+        
+        // If this was the current conversation, clear messages and start new chat
+        if (currentConversationId === conversationId) {
+          setMessages([]);
+          setCurrentConversationId(null);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to delete conversation:', e);
+    }
+  };
+
+  const deleteAllChatHistory = () => {
+    if (window.confirm('Are you sure you want to delete all chat history? This action cannot be undone.')) {
+      try {
+        // Clear localStorage
+        localStorage.removeItem('chat_history');
+        
+        // Clear state
+        setMessages([]);
+        setConversations([]);
+        setCurrentConversationId(null);
+        setInput("");
+        
+        console.log('All chat history deleted');
+      } catch (e) {
+        console.error('Failed to delete all chat history:', e);
+      }
+    }
+  };
+
   const loadConversation = (conversationId: string) => {
     // Load messages for this conversation from localStorage
     try {
@@ -464,27 +524,46 @@ const Chat = () => {
         </div>
 
         {/* Conversation History */}
-        <div className="flex-1 overflow-y-auto px-2">
-          <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Recent</p>
-          <div className="space-y-1">
+        <div className="flex-1 overflow-y-auto px-2 flex flex-col">
+          <div className="flex items-center justify-between px-3 py-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recent</p>
+            {conversations.length > 0 && (
+              <button
+                onClick={deleteAllChatHistory}
+                className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded hover:bg-destructive/10"
+                title="Clear all chat history"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+          <div className="space-y-1 flex-1">
             {conversations.length === 0 ? (
               <p className="px-3 py-2 text-sm text-muted-foreground">No conversations yet</p>
             ) : (
               conversations.map((conv) => (
-                <button
+                <div
                   key={conv.id}
-                  onClick={() => loadConversation(conv.id)}
                   className={cn(
-                    "w-full text-left px-3 py-2.5 rounded-lg hover:bg-secondary/50 transition-colors group",
+                    "relative group w-full px-3 py-2.5 rounded-lg hover:bg-secondary/50 transition-colors",
                     currentConversationId === conv.id && "bg-secondary/30"
                   )}
                 >
-                  <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => loadConversation(conv.id)}
+                    className="w-full text-left flex items-center gap-3"
+                  >
                     <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
                     <span className="text-sm truncate flex-1">{conv.title}</span>
-                    <MoreHorizontal className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                </button>
+                  </button>
+                  <button
+                    onClick={(e) => deleteConversation(conv.id, e)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete conversation"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               ))
             )}
           </div>
