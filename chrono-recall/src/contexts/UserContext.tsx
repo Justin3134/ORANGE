@@ -78,7 +78,32 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setUser(null);
+    
+    // Clear user data
     localStorage.removeItem(STORAGE_KEY);
+    
+    // Clear all Gmail account index mappings (browser-specific mappings)
+    try {
+      const allKeys = Object.keys(localStorage);
+      allKeys.forEach(key => {
+        if (key.startsWith('gmail_account_index_')) {
+          localStorage.removeItem(key);
+        }
+      });
+      console.log('✅ Cleared all Gmail account index mappings');
+    } catch (e) {
+      console.error('❌ Failed to clear Gmail account index mappings:', e);
+    }
+    
+    // Clear chat history
+    try {
+      localStorage.removeItem('chat_history');
+      console.log('✅ Cleared chat history');
+    } catch (e) {
+      console.error('❌ Failed to clear chat history:', e);
+    }
+    
+    console.log('✅ User logged out and all data cleared');
   }, []);
 
   const value = useMemo(() => ({
